@@ -111,13 +111,17 @@ Based in **Boston, MA** | **Ready to start immediately** | **Open to relocation*
 ## 📁 Project Structure
 
 ```
-src/
-├── constants.js      # All text content and personal information
-├── lightTheme.js     # Light theme color configuration
-├── darkTheme.js      # Dark theme color configuration
-├── BusinessCard.jsx  # Main component with 3D rendering
-├── main.jsx          # Application entry point
-└── index.css         # Global styles
+├── .env.example      # Environment variables template
+├── .env              # Your local environment variables (do not commit)
+├── .gitignore        # Git ignore rules
+├── src/
+│   ├── constants.js      # All text content and personal information
+│   ├── lightTheme.js     # Light theme color configuration
+│   ├── darkTheme.js      # Dark theme color configuration
+│   ├── BusinessCard.jsx  # Main component with 3D rendering
+│   ├── analytics.js      # Google Analytics tracking (optional)
+│   ├── main.jsx          # Application entry point
+│   └── index.css         # Global styles
 ```
 
 ## 🚀 Getting Started
@@ -135,9 +139,14 @@ src/
    cd my-business-card
    ```
 
-2. **Install Three.js:**
+2. **Install dependencies:**
    ```bash
-   npm install three
+   npm install three @vercel/analytics
+   ```
+   
+   Optional (for Google Analytics):
+   ```bash
+   npm install react-ga4
    ```
 
 3. **Copy the source files:**
@@ -274,11 +283,15 @@ const [particles] = useState(() =>
 
 | File | Purpose |
 |------|---------|
+| `.env.example` | Template for environment variables |
+| `.env` | Your local environment variables (create from .env.example) |
+| `.gitignore` | Prevents sensitive files from being committed |
 | `constants.js` | All text strings, personal info, skills, and section titles |
 | `lightTheme.js` | Light mode colors and Three.js material settings |
 | `darkTheme.js` | Dark mode colors and Three.js material settings |
 | `BusinessCard.jsx` | Main React component with Three.js scene setup |
-| `main.jsx` | React app entry point |
+| `analytics.js` | Google Analytics 4 tracking functions (optional) |
+| `main.jsx` | React app entry point with Vercel Analytics |
 | `index.css` | Base styles and resets |
 
 ## 🌐 Browser Support
@@ -291,6 +304,51 @@ const [particles] = useState(() =>
 ## 📝 License
 
 MIT License - Feel free to use and modify for your own projects.
+
+---
+
+## 📊 Analytics & Visitor Tracking
+
+Track who's visiting your card and from where. See the detailed **[Analytics Setup Guide](./ANALYTICS.md)** for full instructions.
+
+### Quick Setup: Vercel Analytics
+
+```bash
+npm install @vercel/analytics
+```
+
+Already configured in `main.jsx` - just deploy to Vercel and view analytics in your Vercel dashboard.
+
+### Optional: Google Analytics 4
+
+For more detailed tracking (demographics, company networks, custom events):
+
+```bash
+npm install react-ga4
+```
+
+Create a `.env` file in your project root:
+```bash
+VITE_GA_TRACKING_ID=G-XXXXXXXXXX
+```
+
+Get your tracking ID from [analytics.google.com](https://analytics.google.com) and replace `G-XXXXXXXXXX` with your actual ID.
+
+> ⚠️ **Important**: Never commit your `.env` file to git. Add it to `.gitignore`.
+
+For Vercel deployment, add the environment variable in:
+**Vercel Dashboard → Your Project → Settings → Environment Variables**
+
+### What You Can Track
+
+- 👥 **Visitors** - Total views, unique visitors
+- 🌍 **Location** - Countries, cities
+- 🏢 **Companies** - Network providers (see which companies view your card)
+- 📱 **Devices** - Desktop vs mobile, browsers
+- 🔗 **Referrers** - How people found your card (LinkedIn, GitHub, etc.)
+- 🖱️ **Interactions** - Card flips, theme toggles, time spent
+
+---
 
 ## 🤝 Credits
 

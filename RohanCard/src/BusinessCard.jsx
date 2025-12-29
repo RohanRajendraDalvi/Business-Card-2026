@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as C from './constants';
 import { lightTheme } from './lightTheme';
 import { darkTheme } from './darkTheme';
+import { trackCardFlip, trackThemeToggle } from './analytics';
 
 export default function BusinessCard() {
   const containerRef = useRef(null);
@@ -547,7 +548,12 @@ export default function BusinessCard() {
       prevX = e.clientX; prevY = e.clientY;
     };
     const onMouseUp = () => isDragging = false;
-    const onClick = (e) => { if (Math.abs(e.clientX - prevX) < 5) targetRotY += Math.PI; };
+    const onClick = (e) => { 
+      if (Math.abs(e.clientX - prevX) < 5) {
+        targetRotY += Math.PI;
+        trackCardFlip();
+      }
+    };
     const onWheel = (e) => { e.preventDefault(); camera.position.z = Math.max(2.0, Math.min(8, camera.position.z + e.deltaY * 0.005)); };
 
     let lastTouchDist = 0, lastTapTime = 0;
@@ -573,6 +579,7 @@ export default function BusinessCard() {
         const now = Date.now();
         if (isDragging && Math.abs(e.changedTouches[0].clientX - prevX) < 10 && Math.abs(e.changedTouches[0].clientY - prevY) < 10 && now - lastTapTime > 400) {
           targetRotY += Math.PI;
+          trackCardFlip();
           lastTapTime = now;
         }
         isDragging = false;
@@ -653,7 +660,11 @@ export default function BusinessCard() {
       </div>
       
       <button
-        onClick={() => setIsDark(!isDark)}
+        onClick={() => {
+          const newTheme = !isDark ? 'dark' : 'light';
+          setIsDark(!isDark);
+          trackThemeToggle(newTheme);
+        }}
         style={{
           position: 'fixed',
           top: '20px',
