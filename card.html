@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{background:linear-gradient(135deg,#0a0a0f 0%,#1a1a2e 50%,#0a0a0f 100%);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Segoe UI',sans-serif;overflow:hidden}
+    #scene{width:100%;height:75vh;height:75dvh;cursor:grab;touch-action:none}
+    #scene:active{cursor:grabbing}
+    .info{color:#fff;text-align:center;padding:10px;z-index:10}
+    .info h3{font-size:clamp(10px,2.5vw,14px);color:#00d4ff;letter-spacing:3px;margin-bottom:5px;text-transform:uppercase}
+    .info p{font-size:clamp(9px,2vw,12px);color:rgba(255,255,255,0.6)}
+    .hint{position:fixed;bottom:10px;color:rgba(255,255,255,0.4);font-size:clamp(9px,2vw,12px);animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:0.4}50%{opacity:0.8}}
+    .particles{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:hidden;z-index:0}
+    .particle{position:absolute;bottom:-10px;width:3px;height:3px;background:#00d4ff;border-radius:50%;animation:float 20s infinite linear;opacity:0.6}
+    @keyframes float{0%{transform:translateY(0);opacity:0}5%{opacity:0.6}95%{opacity:0.6}100%{transform:translateY(-110vh);opacity:0}}
+  </style>
+</head>
+<body>
+  <div class="particles" id="particles"></div>
+  <div class="info">
+    <h3>3D Business Card</h3>
+    <p>Drag to rotate | Pinch/Scroll to zoom | Tap to flip</p>
+  </div>
+  <div id="scene"></div>
+  <div class="hint">Tap card to flip</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const pCont=document.getElementById('particles');
+    for(let i=0;i<30;i++){const p=document.createElement('div');p.className='particle';p.style.left=Math.random()*100+'%';p.style.animationDelay=Math.random()*15+'s';p.style.animationDuration=(15+Math.random()*10)+'s';pCont.appendChild(p)}
+
+    // QR Code
+    let qrImage=null;
+    const qrImg=new Image();
+    qrImg.crossOrigin='anonymous';
+    qrImg.onload=()=>{qrImage=qrImg;rebuildCard()};
+    qrImg.src='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=https://rohandalvi.vercel.app&bgcolor=ffffff&color=000000';
+
+    function drawQR(ctx,x,y,size){
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(x-4,y-4,size+8,size+8);
+      if(qrImage)ctx.drawImage(qrImage,x,y,size,size);
+    }
+
+    const container=document.getElementById('scene');
+    let W=container.clientWidth,H=container.clientHeight;
+    const scene=new THREE.Scene();
+    const camera=new THREE.PerspectiveCamera(45,W/H,0.1,1000);
+    
+    function isPortrait(){return W<768||W<H}
+    function getCameraZ(){return isPortrait()?4.5:3.0}
+    camera.position.z=getCameraZ();
+    
+    const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+    renderer.setSize(W,H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+    container.appendChild(renderer.domElement);
+
+    const ambient=new THREE.AmbientLight(0xffffff,0.35);
+    scene.add(ambient);
+    const point1=new THREE.PointLight(0x00d4ff,1.5,10);
+    point1.position.set(2,2,3);
+    scene.add(point1);
+    const point2=new THREE.PointLight(0xff006e,1,10);
+    point2.position.set(-2,-1,2);
+    scene.add(point2);
+
+    const cardGroup=new THREE.Group();
+    scene.add(cardGroup);
+
+    // PORTRAIT FRONT (Mobile)
+    function createFrontPortrait(){
+      const canvas=document.createElement('canvas');
+      canvas.width=700;canvas.height=1100;
+      const ctx=canvas.getContext('2d');
+      
+      const grad=ctx.createLinearGradient(0,0,700,1100);
+      grad.addColorStop(0,'#0d1117');
+      grad.addColorStop(0.5,'#161b22');
+      grad.addColorStop(1,'#0d1117');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,0,700,1100);
+      
+      ctx.strokeStyle='rgba(0,212,255,0.08)';
+      for(let i=0;i<700;i+=40){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,1100);ctx.stroke()}
+      for(let i=0;i<1100;i+=40){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(700,i);ctx.stroke()}
+      
+      // Name
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 72px Segoe UI';
+      ctx.fillText('ROHAN DALVI',30,75);
+      
+      ctx.font='bold 30px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('SOFTWARE ENGINEER',30,115);
+      
+      ctx.font='italic 24px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('"Startup-hardened. Enterprise-ready."',30,152);
+      
+      // Divider
+      const divGrad=ctx.createLinearGradient(30,0,400,0);
+      divGrad.addColorStop(0,'#00d4ff');
+      divGrad.addColorStop(1,'#ff006e');
+      ctx.fillStyle=divGrad;
+      ctx.fillRect(30,168,340,3);
+      
+      // Education
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('EDUCATION',30,205);
+      ctx.font='20px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.95)';
+      ctx.fillText('M.S. Computer Science - Northeastern',30,235);
+      ctx.fillText('B.E. Computer Engineering - Mumbai',30,262);
+      
+      // Why Me
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('WHY ME',30,310);
+      ctx.font='20px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const points=['Veteran of 3 early-stage startups','Team leader & technical mentor','Full-stack: frontend to firmware','Published author (Francis & Taylor)'];
+      points.forEach((p,i)=>ctx.fillText('> '+p,30,342+i*30));
+      
+      // Languages
+      ctx.font='bold 22px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('LANGUAGES',30,480);
+      const langs=['Java','TypeScript','Python','Kotlin','Swift','C/C++/C#'];
+      ctx.font='18px Segoe UI';
+      langs.forEach((t,i)=>{
+        const x=30+(i%3)*215,y=512+(Math.floor(i/3))*38;
+        ctx.fillStyle='rgba(255,0,110,0.12)';
+        ctx.fillRect(x,y-17,205,32);
+        ctx.strokeStyle='rgba(255,0,110,0.4)';
+        ctx.strokeRect(x,y-17,205,32);
+        ctx.fillStyle='#fff';
+        ctx.fillText(t,x+12,y+6);
+      });
+      
+      // Frameworks
+      ctx.font='bold 22px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('FRAMEWORKS',30,610);
+      const frameworks=['React + Native','Flutter + Dart','Node.js','Angular','Express','SQL / NoSQL'];
+      ctx.font='18px Segoe UI';
+      frameworks.forEach((t,i)=>{
+        const x=30+(i%3)*215,y=642+(Math.floor(i/3))*38;
+        ctx.fillStyle='rgba(0,212,255,0.12)';
+        ctx.fillRect(x,y-17,205,32);
+        ctx.strokeStyle='rgba(0,212,255,0.4)';
+        ctx.strokeRect(x,y-17,205,32);
+        ctx.fillStyle='#fff';
+        ctx.fillText(t,x+12,y+6);
+      });
+      
+      // AI & Specialized
+      ctx.font='bold 22px Segoe UI';
+      ctx.fillStyle='#a855f7';
+      ctx.fillText('AI & SPECIALIZED',30,740);
+      const ai=['PyTorch','TensorFlow','LangChain','OpenCV','FAISS','Hugging Face'];
+      ctx.font='18px Segoe UI';
+      ai.forEach((t,i)=>{
+        const x=30+(i%3)*215,y=772+(Math.floor(i/3))*38;
+        ctx.fillStyle='rgba(168,85,247,0.12)';
+        ctx.fillRect(x,y-17,205,32);
+        ctx.strokeStyle='rgba(168,85,247,0.4)';
+        ctx.strokeRect(x,y-17,205,32);
+        ctx.fillStyle='#fff';
+        ctx.fillText(t,x+12,y+6);
+      });
+      
+      // Relocate badge
+      ctx.fillStyle='#ff006e';
+      ctx.beginPath();
+      ctx.roundRect(140,870,420,65,32);
+      ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.font='bold 28px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('READY TO RELOCATE',350,912);
+      ctx.textAlign='left';
+      
+      // Corners
+      ctx.strokeStyle='#00d4ff';
+      ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(15,15);ctx.lineTo(15,60);ctx.moveTo(15,15);ctx.lineTo(60,15);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(685,15);ctx.lineTo(685,60);ctx.moveTo(685,15);ctx.lineTo(640,15);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(15,1085);ctx.lineTo(15,1040);ctx.moveTo(15,1085);ctx.lineTo(60,1085);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(685,1085);ctx.lineTo(685,1040);ctx.moveTo(685,1085);ctx.lineTo(640,1085);ctx.stroke();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // PORTRAIT BACK (Mobile)
+    function createBackPortrait(){
+      const canvas=document.createElement('canvas');
+      canvas.width=700;canvas.height=1100;
+      const ctx=canvas.getContext('2d');
+      
+      const grad=ctx.createRadialGradient(350,550,0,350,550,700);
+      grad.addColorStop(0,'#1a1a2e');
+      grad.addColorStop(1,'#0a0a0f');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,0,700,1100);
+      
+      ctx.strokeStyle='rgba(0,212,255,0.12)';
+      for(let i=0;i<20;i++){
+        const x=Math.random()*700,y=Math.random()*1100;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.random()*80-40,y);ctx.lineTo(x+Math.random()*80-40,y+Math.random()*80-40);ctx.stroke();
+        ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.stroke();
+      }
+      
+      // Name
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 64px Segoe UI';
+      ctx.fillText('ROHAN DALVI',30,75);
+      ctx.font='28px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('AI Engineer | VR/XR Specialist',30,115);
+      
+      const divGrad=ctx.createLinearGradient(30,0,400,0);
+      divGrad.addColorStop(0,'#00d4ff');
+      divGrad.addColorStop(1,'#ff006e');
+      ctx.fillStyle=divGrad;
+      ctx.fillRect(30,135,380,3);
+      
+      // Connect
+      ctx.font='bold 26px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('CONNECT',30,180);
+      ctx.font='24px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('dalvi.ro@northeastern.edu',30,215);
+      ctx.fillText('+1 (857) 313-1819',30,248);
+      
+      // Online
+      ctx.font='bold 26px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('ONLINE',30,300);
+      ctx.font='21px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.fillText('linkedin.com/in/rohan-dalvi-3848771b8',30,333);
+      ctx.fillText('github.com/RohanRajendraDalvi',30,363);
+      ctx.fillText('rohandalvi.vercel.app',30,393);
+      
+      // What I Bring
+      ctx.font='bold 26px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('WHAT I BRING',30,450);
+      ctx.font='21px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const brings=['Adaptability across diverse tech stacks','Leadership that elevates entire teams','Solutions that ship and scale','Communication that bridges technical gaps'];
+      brings.forEach((b,i)=>ctx.fillText('> '+b,30,485+i*34));
+      
+      // Specializations
+      ctx.font='bold 26px Segoe UI';
+      ctx.fillStyle='#a855f7';
+      ctx.fillText('SPECIALIZATIONS',30,635);
+      ctx.font='21px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const specs=['AR/VR Device Development','Real-time ML Captioning','WebRTC Interview Systems','Cross-platform Mobile Apps'];
+      specs.forEach((s,i)=>ctx.fillText('> '+s,30,670+i*34));
+      
+      // Certifications
+      ctx.font='bold 26px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('CERTIFICATIONS',30,820);
+      ctx.font='21px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      const certs=['AWS Cloud Architect','Amazon ML Engineer','Google Cloud Certified','Cyber Security + Information Security'];
+      certs.forEach((c,i)=>ctx.fillText('> '+c,30,855+i*34));
+      
+      // Glasses
+      ctx.strokeStyle='rgba(0,212,255,0.5)';
+      ctx.lineWidth=5;
+      ctx.beginPath();
+      ctx.roundRect(420,160,120,60,12);
+      ctx.roundRect(560,160,120,60,12);
+      ctx.moveTo(540,190);ctx.lineTo(560,190);
+      ctx.stroke();
+      ctx.fillStyle='rgba(0,212,255,0.15)';
+      ctx.fillRect(430,170,100,40);
+      ctx.fillRect(570,170,100,40);
+      
+      // QR
+      drawQR(ctx,520,750,150);
+      ctx.font='bold 18px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.7)';
+      ctx.textAlign='center';
+      ctx.fillText('PORTFOLIO',595,920);
+      ctx.textAlign='left';
+      
+      // Corners
+      ctx.strokeStyle='#ff006e';
+      ctx.lineWidth=3;
+      ctx.beginPath();ctx.moveTo(15,15);ctx.lineTo(15,60);ctx.moveTo(15,15);ctx.lineTo(60,15);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(685,15);ctx.lineTo(685,60);ctx.moveTo(685,15);ctx.lineTo(640,15);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(15,1085);ctx.lineTo(15,1040);ctx.moveTo(15,1085);ctx.lineTo(60,1085);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(685,1085);ctx.lineTo(685,1040);ctx.moveTo(685,1085);ctx.lineTo(640,1085);ctx.stroke();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // LANDSCAPE FRONT (Desktop)
+    function createFrontLandscape(){
+      const canvas=document.createElement('canvas');
+      canvas.width=1400;canvas.height=820;
+      const ctx=canvas.getContext('2d');
+      
+      const grad=ctx.createLinearGradient(0,0,1400,820);
+      grad.addColorStop(0,'#0d1117');
+      grad.addColorStop(0.5,'#161b22');
+      grad.addColorStop(1,'#0d1117');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,0,1400,820);
+      
+      ctx.strokeStyle='rgba(0,212,255,0.08)';
+      for(let i=0;i<1400;i+=50){ctx.beginPath();ctx.moveTo(i,0);ctx.lineTo(i,820);ctx.stroke()}
+      for(let i=0;i<820;i+=50){ctx.beginPath();ctx.moveTo(0,i);ctx.lineTo(1400,i);ctx.stroke()}
+      
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 88px Segoe UI';
+      ctx.fillText('ROHAN DALVI',50,140);
+      
+      ctx.font='bold 32px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('SOFTWARE ENGINEER',50,185);
+      
+      ctx.font='italic 26px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('"Startup-hardened. Enterprise-ready."',50,225);
+      
+      const divGrad=ctx.createLinearGradient(50,0,500,0);
+      divGrad.addColorStop(0,'#00d4ff');
+      divGrad.addColorStop(0.5,'#ff006e');
+      divGrad.addColorStop(1,'transparent');
+      ctx.fillStyle=divGrad;
+      ctx.fillRect(50,245,450,3);
+      
+      ctx.font='bold 22px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('EDUCATION',50,290);
+      ctx.font='20px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.95)';
+      ctx.fillText('M.S. Computer Science - Northeastern University',50,325);
+      ctx.fillText('B.E. Computer Engineering - University of Mumbai',50,355);
+      
+      ctx.font='bold 22px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('WHY ME',50,405);
+      ctx.font='20px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const points=['Veteran of 3 early-stage startups','Team leader & technical mentor','Full-stack: frontend to firmware','Published author (Francis & Taylor)'];
+      points.forEach((p,i)=>ctx.fillText('> '+p,50,440+i*32));
+      
+      ctx.fillStyle='#ff006e';
+      ctx.beginPath();
+      ctx.roundRect(50,565,320,65,32);
+      ctx.fill();
+      ctx.fillStyle='#fff';
+      ctx.font='bold 26px Segoe UI';
+      ctx.textAlign='center';
+      ctx.fillText('READY TO RELOCATE',210,608);
+      ctx.textAlign='left';
+      
+      const techX=720;
+      ctx.font='bold 20px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('LANGUAGES',techX,290);
+      const languages=['Java','TypeScript','Python','Kotlin','Swift','C / C++ / C#'];
+      ctx.font='18px Segoe UI';
+      languages.forEach((tech,i)=>{
+        const x=techX+(i%3)*220,y=320+(Math.floor(i/3))*42;
+        ctx.fillStyle='rgba(255,0,110,0.12)';
+        ctx.fillRect(x,y-18,205,34);
+        ctx.strokeStyle='rgba(255,0,110,0.4)';
+        ctx.strokeRect(x,y-18,205,34);
+        ctx.fillStyle='rgba(255,255,255,0.95)';
+        ctx.fillText(tech,x+14,y+6);
+      });
+      
+      ctx.font='bold 20px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('FRAMEWORKS',techX,430);
+      const frameworks=['React + Native','Flutter + Dart','Node.js','Angular','Express','SQL / NoSQL'];
+      ctx.font='18px Segoe UI';
+      frameworks.forEach((tech,i)=>{
+        const x=techX+(i%3)*220,y=460+(Math.floor(i/3))*42;
+        ctx.fillStyle='rgba(0,212,255,0.12)';
+        ctx.fillRect(x,y-18,205,34);
+        ctx.strokeStyle='rgba(0,212,255,0.4)';
+        ctx.strokeRect(x,y-18,205,34);
+        ctx.fillStyle='rgba(255,255,255,0.95)';
+        ctx.fillText(tech,x+14,y+6);
+      });
+      
+      ctx.font='bold 20px Segoe UI';
+      ctx.fillStyle='#a855f7';
+      ctx.fillText('AI & SPECIALIZED',techX,570);
+      const specialized=['PyTorch','TensorFlow','LangChain','OpenCV','FAISS','Hugging Face'];
+      ctx.font='18px Segoe UI';
+      specialized.forEach((tech,i)=>{
+        const x=techX+(i%3)*220,y=600+(Math.floor(i/3))*42;
+        ctx.fillStyle='rgba(168,85,247,0.12)';
+        ctx.fillRect(x,y-18,205,34);
+        ctx.strokeStyle='rgba(168,85,247,0.4)';
+        ctx.strokeRect(x,y-18,205,34);
+        ctx.fillStyle='rgba(255,255,255,0.95)';
+        ctx.fillText(tech,x+14,y+6);
+      });
+      
+      ctx.strokeStyle='#00d4ff';
+      ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(20,20);ctx.lineTo(20,80);ctx.moveTo(20,20);ctx.lineTo(80,20);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(1380,20);ctx.lineTo(1380,80);ctx.moveTo(1380,20);ctx.lineTo(1320,20);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(20,800);ctx.lineTo(20,740);ctx.moveTo(20,800);ctx.lineTo(80,800);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(1380,800);ctx.lineTo(1380,740);ctx.moveTo(1380,800);ctx.lineTo(1320,800);ctx.stroke();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    // LANDSCAPE BACK (Desktop)
+    function createBackLandscape(){
+      const canvas=document.createElement('canvas');
+      canvas.width=1400;canvas.height=820;
+      const ctx=canvas.getContext('2d');
+      
+      const grad=ctx.createRadialGradient(700,410,0,700,410,800);
+      grad.addColorStop(0,'#1a1a2e');
+      grad.addColorStop(1,'#0a0a0f');
+      ctx.fillStyle=grad;
+      ctx.fillRect(0,0,1400,820);
+      
+      ctx.strokeStyle='rgba(0,212,255,0.12)';
+      for(let i=0;i<30;i++){
+        const x=Math.random()*1400,y=Math.random()*820;
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.random()*140-70,y);ctx.lineTo(x+Math.random()*140-70,y+Math.random()*140-70);ctx.stroke();
+        ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.stroke();
+      }
+      
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 72px Segoe UI';
+      ctx.fillText('ROHAN DALVI',50,100);
+      ctx.font='28px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('AI Engineer | VR/XR Specialist',50,145);
+      
+      const divGrad=ctx.createLinearGradient(50,0,600,0);
+      divGrad.addColorStop(0,'#00d4ff');
+      divGrad.addColorStop(1,'#ff006e');
+      ctx.fillStyle=divGrad;
+      ctx.fillRect(50,165,550,3);
+      
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('CONNECT',50,215);
+      ctx.font='24px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('dalvi.ro@northeastern.edu',50,258);
+      ctx.fillText('+1 (857) 313-1819',50,295);
+      
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('ONLINE',50,355);
+      ctx.font='22px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      ctx.fillText('linkedin.com/in/rohan-dalvi-3848771b8',50,395);
+      ctx.fillText('github.com/RohanRajendraDalvi',50,432);
+      ctx.fillText('rohandalvi.vercel.app',50,469);
+      
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#ff006e';
+      ctx.fillText('WHAT I BRING',50,535);
+      ctx.font='22px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const brings=['Adaptability across diverse tech stacks','Leadership that elevates entire teams','Solutions that ship and scale','Communication that bridges technical gaps'];
+      brings.forEach((b,i)=>ctx.fillText('> '+b,50,575+i*38));
+      
+      ctx.strokeStyle='rgba(0,212,255,0.5)';
+      ctx.lineWidth=6;
+      ctx.beginPath();
+      ctx.roundRect(700,180,180,90,16);
+      ctx.roundRect(910,180,180,90,16);
+      ctx.moveTo(880,225);ctx.lineTo(910,225);
+      ctx.moveTo(700,225);ctx.lineTo(660,208);
+      ctx.moveTo(1090,225);ctx.lineTo(1130,208);
+      ctx.stroke();
+      ctx.fillStyle='rgba(0,212,255,0.15)';
+      ctx.fillRect(715,195,150,60);
+      ctx.fillRect(925,195,150,60);
+      
+      ctx.font='italic 24px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.7)';
+      ctx.fillText('"Building the future of human-computer interaction"',650,330);
+      
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#a855f7';
+      ctx.fillText('SPECIALIZATIONS',650,400);
+      ctx.font='22px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.9)';
+      const specs=['AR/VR Device Development','Real-time ML Captioning','WebRTC Interview Systems','Cross-platform Mobile Apps'];
+      specs.forEach((s,i)=>ctx.fillText('> '+s,650,442+i*38));
+      
+      ctx.font='bold 24px Segoe UI';
+      ctx.fillStyle='#00d4ff';
+      ctx.fillText('CERTIFICATIONS',650,620);
+      ctx.font='20px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.85)';
+      const certs=['AWS Cloud Architect','Amazon ML Engineer','Google Cloud Certified','Cyber Security + Information Security'];
+      certs.forEach((c,i)=>ctx.fillText('> '+c,650,658+i*34));
+      
+      drawQR(ctx,1180,550,160);
+      ctx.font='bold 16px Segoe UI';
+      ctx.fillStyle='rgba(255,255,255,0.7)';
+      ctx.fillText('PORTFOLIO',1215,735);
+      
+      ctx.strokeStyle='#ff006e';
+      ctx.lineWidth=4;
+      ctx.beginPath();ctx.moveTo(20,20);ctx.lineTo(20,80);ctx.moveTo(20,20);ctx.lineTo(80,20);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(1380,20);ctx.lineTo(1380,80);ctx.moveTo(1380,20);ctx.lineTo(1320,20);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(20,800);ctx.lineTo(20,740);ctx.moveTo(20,800);ctx.lineTo(80,800);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(1380,800);ctx.lineTo(1380,740);ctx.moveTo(1380,800);ctx.lineTo(1320,800);ctx.stroke();
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    let card,edges,materials;
+    
+    function rebuildCard(){
+      // Remove old card
+      if(card){cardGroup.remove(card);cardGroup.remove(edges)}
+      
+      const portrait=isPortrait();
+      const cw=portrait?2.0:3.6;
+      const ch=portrait?3.2:2.2;
+      
+      const cardGeo=new THREE.BoxGeometry(cw,ch,0.08);
+      materials=[
+        new THREE.MeshStandardMaterial({color:0x1a1a2e,metalness:0.8,roughness:0.2}),
+        new THREE.MeshStandardMaterial({color:0x1a1a2e,metalness:0.8,roughness:0.2}),
+        new THREE.MeshStandardMaterial({color:0x1a1a2e,metalness:0.8,roughness:0.2}),
+        new THREE.MeshStandardMaterial({color:0x1a1a2e,metalness:0.8,roughness:0.2}),
+        new THREE.MeshStandardMaterial({map:portrait?createFrontPortrait():createFrontLandscape(),metalness:0.3,roughness:0.4}),
+        new THREE.MeshStandardMaterial({map:portrait?createBackPortrait():createBackLandscape(),metalness:0.3,roughness:0.4})
+      ];
+      card=new THREE.Mesh(cardGeo,materials);
+      cardGroup.add(card);
+      
+      const edgeGeo=new THREE.EdgesGeometry(cardGeo);
+      const edgeMat=new THREE.LineBasicMaterial({color:0x00d4ff,transparent:true,opacity:0.6});
+      edges=new THREE.LineSegments(edgeGeo,edgeMat);
+      cardGroup.add(edges);
+    }
+    
+    rebuildCard();
+
+    const orbGeo=new THREE.SphereGeometry(0.05,16,16);
+    const orbs=[];
+    for(let i=0;i<8;i++){
+      const orbMat=new THREE.MeshBasicMaterial({color:i%2?0x00d4ff:0xff006e,transparent:true,opacity:0.8});
+      const orb=new THREE.Mesh(orbGeo,orbMat);
+      orb.position.set((Math.random()-0.5)*4,(Math.random()-0.5)*3,(Math.random()-0.5)*2);
+      orb.userData={speed:0.5+Math.random(),offset:Math.random()*Math.PI*2};
+      scene.add(orb);
+      orbs.push(orb);
+    }
+
+    let isDragging=false,prevX=0,prevY=0;
+    let targetRotX=0.1,targetRotY=0;
+
+    container.addEventListener('mousedown',e=>{isDragging=true;prevX=e.clientX;prevY=e.clientY});
+    container.addEventListener('mousemove',e=>{
+      if(!isDragging)return;
+      const dx=e.clientX-prevX,dy=e.clientY-prevY;
+      targetRotY+=dx*0.01;
+      targetRotX+=dy*0.01;
+      targetRotX=Math.max(-0.5,Math.min(0.5,targetRotX));
+      prevX=e.clientX;prevY=e.clientY;
+    });
+    container.addEventListener('mouseup',()=>isDragging=false);
+    container.addEventListener('mouseleave',()=>isDragging=false);
+    container.addEventListener('click',e=>{if(Math.abs(e.clientX-prevX)<5)targetRotY+=Math.PI});
+    container.addEventListener('wheel',e=>{e.preventDefault();camera.position.z+=e.deltaY*0.005;camera.position.z=Math.max(2.0,Math.min(8,camera.position.z))},{passive:false});
+
+    let lastTouchDist=0,lastTapTime=0;
+    container.addEventListener('touchstart',e=>{
+      if(e.touches.length===1){isDragging=true;prevX=e.touches[0].clientX;prevY=e.touches[0].clientY}
+      else if(e.touches.length===2){lastTouchDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)}
+    });
+    container.addEventListener('touchmove',e=>{
+      e.preventDefault();
+      if(e.touches.length===1&&isDragging){
+        const dx=e.touches[0].clientX-prevX,dy=e.touches[0].clientY-prevY;
+        targetRotY+=dx*0.01;targetRotX+=dy*0.01;
+        targetRotX=Math.max(-0.5,Math.min(0.5,targetRotX));
+        prevX=e.touches[0].clientX;prevY=e.touches[0].clientY;
+      }else if(e.touches.length===2){
+        const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+        camera.position.z+=(lastTouchDist-dist)*0.02;
+        camera.position.z=Math.max(2.0,Math.min(8,camera.position.z));
+        lastTouchDist=dist;
+      }
+    },{passive:false});
+    container.addEventListener('touchend',e=>{
+      if(e.touches.length===0){
+        const now=Date.now();
+        if(isDragging&&Math.abs(e.changedTouches[0].clientX-prevX)<10&&Math.abs(e.changedTouches[0].clientY-prevY)<10&&now-lastTapTime>400){
+          targetRotY+=Math.PI;
+          lastTapTime=now;
+        }
+        isDragging=false;
+      }
+    });
+
+    let time=0,lastPortrait=isPortrait();
+    function animate(){
+      requestAnimationFrame(animate);
+      time+=0.016;
+      cardGroup.rotation.x+=(targetRotX-cardGroup.rotation.x)*0.08;
+      cardGroup.rotation.y+=(targetRotY-cardGroup.rotation.y)*0.08;
+      cardGroup.position.y=Math.sin(time)*0.05;
+      orbs.forEach(o=>{o.position.y+=Math.sin(time*o.userData.speed+o.userData.offset)*0.002;o.position.x+=Math.cos(time*o.userData.speed*0.5+o.userData.offset)*0.001});
+      point1.position.x=Math.sin(time*0.5)*3;
+      point1.position.y=Math.cos(time*0.5)*2;
+      renderer.render(scene,camera);
+    }
+    animate();
+
+    window.addEventListener('resize',()=>{
+      W=container.clientWidth;H=container.clientHeight;
+      camera.aspect=W/H;
+      camera.position.z=getCameraZ();
+      camera.updateProjectionMatrix();
+      renderer.setSize(W,H);
+      if(isPortrait()!==lastPortrait){lastPortrait=isPortrait();rebuildCard()}
+    });
+  </script>
+</body>
+</html>
