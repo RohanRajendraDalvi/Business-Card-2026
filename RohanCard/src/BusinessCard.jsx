@@ -549,14 +549,18 @@ export default function BusinessCard() {
     };
     const onMouseUp = () => isDragging = false;
     const onClick = (e) => { 
-      if (Math.abs(e.clientX - prevX) < 5) {
+    if (touchHandled) {
+        touchHandled = false;
+        return;
+    }
+    if (Math.abs(e.clientX - prevX) < 5) {
         targetRotY += Math.PI;
         trackCardFlip();
-      }
+    }
     };
     const onWheel = (e) => { e.preventDefault(); camera.position.z = Math.max(2.0, Math.min(8, camera.position.z + e.deltaY * 0.005)); };
 
-    let lastTouchDist = 0, lastTapTime = 0;
+    let lastTouchDist = 0, lastTapTime = 0, touchHandled = false;
     const onTouchStart = (e) => {
       if (e.touches.length === 1) { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; }
       else if (e.touches.length === 2) lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -575,15 +579,16 @@ export default function BusinessCard() {
       }
     };
     const onTouchEnd = (e) => {
-      if (e.touches.length === 0) {
+    if (e.touches.length === 0) {
         const now = Date.now();
         if (isDragging && Math.abs(e.changedTouches[0].clientX - prevX) < 10 && Math.abs(e.changedTouches[0].clientY - prevY) < 10 && now - lastTapTime > 400) {
-          targetRotY += Math.PI;
-          trackCardFlip();
-          lastTapTime = now;
+        targetRotY += Math.PI;
+        trackCardFlip();
+        touchHandled = true;
+        lastTapTime = now;
         }
         isDragging = false;
-      }
+    }
     };
 
     container.addEventListener('mousedown', onMouseDown);
