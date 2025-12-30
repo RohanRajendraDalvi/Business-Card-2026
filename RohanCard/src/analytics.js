@@ -62,3 +62,8 @@ export const trackOutboundLink = (url) => {
 export const trackQRVisible = () => {
   trackEvent('Card Interaction', 'QR Visible', 'User viewed QR code side');
 };
+
+// Track contact/vCard download
+export const trackContactDownload = () => {
+  trackEvent('Card Interaction', 'Contact Download', 'User downloaded vCard contact');
+};

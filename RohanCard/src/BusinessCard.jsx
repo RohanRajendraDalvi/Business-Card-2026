@@ -3,14 +3,61 @@ import * as THREE from 'three';
 import * as C from './constants';
 import { lightTheme } from './lightTheme';
 import { darkTheme } from './darkTheme';
-import { trackCardFlip, trackThemeToggle } from './analytics';
+import { trackCardFlip, trackThemeToggle, trackContactDownload } from './analytics';
 
+// ============ VCARD FUNCTIONS ============
+function cleanContactData(str) {
+  if (!str) return '';
+  return str.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]/gu, '').trim();
+}
+
+function generateVCard() {
+  const name = C.NAME || 'Contact';
+  const nameParts = name.split(' ');
+  const lastName = nameParts.length > 1 ? nameParts.pop() : '';
+  const firstName = nameParts.join(' ');
+  
+  let vcard = [
+    'BEGIN:VCARD',
+    'VERSION:3.0',
+    `FN:${name}`,
+    `N:${lastName};${firstName};;;`,
+    `TITLE:${C.TITLE || ''}`,
+    `ORG:${C.ALT_TITLE || ''}`,
+  ];
+  
+  if (C.EMAIL) vcard.push(`EMAIL;TYPE=WORK:${cleanContactData(C.EMAIL)}`);
+  if (C.PHONE) vcard.push(`TEL;TYPE=CELL:${cleanContactData(C.PHONE)}`);
+  if (C.PORTFOLIO_URL) vcard.push(`URL;TYPE=WORK:https://${cleanContactData(C.PORTFOLIO_URL)}`);
+  if (C.LINKEDIN) vcard.push(`X-SOCIALPROFILE;TYPE=linkedin:https://${cleanContactData(C.LINKEDIN)}`);
+  if (C.GITHUB) vcard.push(`X-SOCIALPROFILE;TYPE=github:https://${cleanContactData(C.GITHUB)}`);
+  if (C.TAGLINE) vcard.push(`NOTE:${C.TAGLINE.replace(/"/g, '')}`);
+  
+  vcard.push('END:VCARD');
+  return vcard.join('\r\n');
+}
+
+function downloadVCard() {
+  const vcard = generateVCard();
+  const blob = new Blob([vcard], { type: 'text/vcard;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${(C.NAME || 'contact').replace(/\s+/g, '_')}.vcf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// ============ MAIN COMPONENT ============
 export default function BusinessCard() {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
   const animationRef = useRef(null);
   const sceneRef = useRef(null);
   const [isDark, setIsDark] = useState(true);
+  const [showSaved, setShowSaved] = useState(false);
   const themeRef = useRef(isDark ? darkTheme : lightTheme);
   
   const [particles] = useState(() => 
@@ -548,19 +595,17 @@ export default function BusinessCard() {
       prevX = e.clientX; prevY = e.clientY;
     };
     const onMouseUp = () => isDragging = false;
+    let touchHandled = false;
     const onClick = (e) => { 
-    if (touchHandled) {
-        touchHandled = false;
-        return;
-    }
-    if (Math.abs(e.clientX - prevX) < 5) {
+      if (touchHandled) { touchHandled = false; return; }
+      if (Math.abs(e.clientX - prevX) < 5) {
         targetRotY += Math.PI;
         trackCardFlip();
-    }
+      }
     };
     const onWheel = (e) => { e.preventDefault(); camera.position.z = Math.max(2.0, Math.min(8, camera.position.z + e.deltaY * 0.005)); };
 
-    let lastTouchDist = 0, lastTapTime = 0, touchHandled = false;
+    let lastTouchDist = 0, lastTapTime = 0;
     const onTouchStart = (e) => {
       if (e.touches.length === 1) { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; }
       else if (e.touches.length === 2) lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
@@ -579,16 +624,16 @@ export default function BusinessCard() {
       }
     };
     const onTouchEnd = (e) => {
-    if (e.touches.length === 0) {
+      if (e.touches.length === 0) {
         const now = Date.now();
         if (isDragging && Math.abs(e.changedTouches[0].clientX - prevX) < 10 && Math.abs(e.changedTouches[0].clientY - prevY) < 10 && now - lastTapTime > 400) {
-        targetRotY += Math.PI;
-        trackCardFlip();
-        touchHandled = true;
-        lastTapTime = now;
+          targetRotY += Math.PI;
+          trackCardFlip();
+          touchHandled = true;
+          lastTapTime = now;
         }
         isDragging = false;
-    }
+      }
     };
 
     container.addEventListener('mousedown', onMouseDown);
@@ -689,6 +734,39 @@ export default function BusinessCard() {
         }}
       >
         {isDark ? '☀️ Light' : '🌙 Dark'}
+      </button>
+      
+      <button
+        onClick={() => {
+          downloadVCard();
+          trackContactDownload();
+          setShowSaved(true);
+          setTimeout(() => setShowSaved(false), 2000);
+        }}
+        style={{
+          position: 'fixed',
+          bottom: '5vh',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 100,
+          padding: '12px 20px',
+          borderRadius: '25px',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '14px',
+          fontWeight: 'bold',
+          transition: 'all 0.3s ease',
+          background: showSaved
+            ? (isDark ? 'rgba(0,255,136,0.3)' : 'rgba(5,150,105,0.3)')
+            : (isDark 
+              ? 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(255,0,128,0.2))' 
+              : 'linear-gradient(135deg, rgba(30,58,95,0.2), rgba(59,130,246,0.2))'),
+          color: isDark ? '#00ff88' : '#059669',
+          backdropFilter: 'blur(10px)',
+          boxShadow: isDark ? '0 4px 15px rgba(0,255,136,0.3)' : '0 4px 15px rgba(5,150,105,0.3)',
+        }}
+      >
+        {showSaved ? '✓ Downloaded!' : 'Add to Contacts'}
       </button>
       
       <div style={{ color: theme.textPrimary, textAlign: 'center', padding: '10px', zIndex: 10 }}>
