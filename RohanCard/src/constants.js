@@ -29,12 +29,12 @@ export const SECTION_CERTIFICATIONS = 'CERTIFICATIONS';
 
 // Education
 export const EDUCATION = [
-  'M.S. Computer Science - Northeastern',
-  'B.E. Computer Engineering - Mumbai'
-];
-export const EDUCATION_FULL = [
   'M.S. Computer Science - Northeastern University',
   'B.E. Computer Engineering - University of Mumbai'
+];
+export const EDUCATION_FULL = [
+  'M.S. Computer Science - Northeastern University - 3.9/4.0 GPA',
+  'B.E. Computer Engineering - University of Mumbai - 3.9/4.0 GPA'
 ];
 
 // Why Me Points
