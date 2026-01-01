@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import * as C from './constants';
 import { lightTheme } from './lightTheme';
 import { darkTheme } from './darkTheme';
 import { trackCardFlip, trackThemeToggle, trackContactDownload } from './analytics';
+import { drawPattern, getMaterialValues, materialSettings, drawLogo, logoSettings } from './materials';
 
 // ============ VCARD FUNCTIONS ============
 function cleanContactData(str) {
@@ -28,9 +29,9 @@ function generateVCard() {
   
   if (C.EMAIL) vcard.push(`EMAIL;TYPE=WORK:${cleanContactData(C.EMAIL)}`);
   if (C.PHONE) vcard.push(`TEL;TYPE=CELL:${cleanContactData(C.PHONE)}`);
-  if (C.PORTFOLIO_URL) vcard.push(`URL;TYPE=WORK:https://${cleanContactData(C.PORTFOLIO_URL)}`);
-  if (C.LINKEDIN) vcard.push(`X-SOCIALPROFILE;TYPE=linkedin:https://${cleanContactData(C.LINKEDIN)}`);
-  if (C.GITHUB) vcard.push(`X-SOCIALPROFILE;TYPE=github:https://${cleanContactData(C.GITHUB)}`);
+  if (C.LINK_URL) vcard.push(`URL;TYPE=WORK:https://${cleanContactData(C.LINK_URL)}`);
+  if (C.ONLINE_LINKS?.[0]) vcard.push(`X-SOCIALPROFILE;TYPE=linkedin:https://${cleanContactData(C.ONLINE_LINKS[0])}`);
+  if (C.ONLINE_LINKS?.[1]) vcard.push(`X-SOCIALPROFILE;TYPE=github:https://${cleanContactData(C.ONLINE_LINKS[1])}`);
   if (C.TAGLINE) vcard.push(`NOTE:${C.TAGLINE.replace(/"/g, '')}`);
   
   vcard.push('END:VCARD');
@@ -50,82 +51,37 @@ function downloadVCard() {
   URL.revokeObjectURL(url);
 }
 
-// ============ MAIN COMPONENT ============
-export default function BusinessCard() {
-  const containerRef = useRef(null);
-  const rendererRef = useRef(null);
-  const animationRef = useRef(null);
-  const sceneRef = useRef(null);
-  const [isDark, setIsDark] = useState(true);
-  const [showSaved, setShowSaved] = useState(false);
-  const themeRef = useRef(isDark ? darkTheme : lightTheme);
+// ============ TEXTURE FACTORY ============
+function createTextureFactory(theme, images) {
+  const t = theme;
   
-  const [particles] = useState(() => 
-    Array.from({ length: 30 }, (_, i) => ({
-      id: i,
-      left: Math.random() * 100,
-      delay: Math.random() * 15,
-      duration: 15 + Math.random() * 10
-    }))
-  );
-
-  const theme = isDark ? darkTheme : lightTheme;
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    themeRef.current = isDark ? darkTheme : lightTheme;
-    
-    if (rendererRef.current) {
-      rendererRef.current.dispose();
-      if (containerRef.current.contains(rendererRef.current.domElement)) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
-      }
+  const calcFontSize = (ctx, text, maxWidth, maxSize, minSize = 24) => {
+    let size = maxSize;
+    ctx.font = `bold ${size}px Segoe UI`;
+    while (ctx.measureText(text).width > maxWidth && size > minSize) {
+      size -= 4;
+      ctx.font = `bold ${size}px Segoe UI`;
     }
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    return size;
+  };
 
-    const container = containerRef.current;
-    const t = themeRef.current;
-    let W = container.clientWidth, H = container.clientHeight;
-    let qrImage = null;
+  const drawQR = (ctx, img, x, y, size) => {
+    ctx.fillStyle = t.qrBg;
+    ctx.fillRect(x - 4, y - 4, size + 8, size + 8);
+    if (img) ctx.drawImage(img, x, y, size, size);
+  };
 
-    const qrImg = new Image();
-    qrImg.crossOrigin = 'anonymous';
-    qrImg.onload = () => { qrImage = qrImg; rebuildCard(); };
-    qrImg.src = `${C.QR_CODE_URL}&bgcolor=${t.qrBgColor}&color=${t.qrFgColor}`;
+  const drawCorners = (ctx, color, w, h, inset = 15, len = 45, lw = 3) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lw;
+    ctx.beginPath(); ctx.moveTo(inset, inset); ctx.lineTo(inset, inset + len); ctx.moveTo(inset, inset); ctx.lineTo(inset + len, inset); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - inset, inset); ctx.lineTo(w - inset, inset + len); ctx.moveTo(w - inset, inset); ctx.lineTo(w - inset - len, inset); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(inset, h - inset); ctx.lineTo(inset, h - inset - len); ctx.moveTo(inset, h - inset); ctx.lineTo(inset + len, h - inset); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - inset, h - inset); ctx.lineTo(w - inset, h - inset - len); ctx.moveTo(w - inset, h - inset); ctx.lineTo(w - inset - len, h - inset); ctx.stroke();
+  };
 
-    function drawQR(ctx, x, y, size) {
-      ctx.fillStyle = t.qrBg;
-      ctx.fillRect(x - 4, y - 4, size + 8, size + 8);
-      if (qrImage) ctx.drawImage(qrImage, x, y, size, size);
-    }
-
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
-    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
-    
-    const isPortrait = () => W < 768 || W < H;
-    const getCameraZ = () => isPortrait() ? 4.5 : 3.0;
-    camera.position.z = getCameraZ();
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    rendererRef.current = renderer;
-    renderer.setSize(W, H);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
-
-    const ambient = new THREE.AmbientLight(0xffffff, t.ambientIntensity);
-    scene.add(ambient);
-    const point1 = new THREE.PointLight(t.lightColor1, t.point1Intensity, 10);
-    point1.position.set(2, 2, 3);
-    scene.add(point1);
-    const point2 = new THREE.PointLight(t.lightColor2, t.point2Intensity, 10);
-    point2.position.set(-2, -1, 2);
-    scene.add(point2);
-
-    const cardGroup = new THREE.Group();
-    scene.add(cardGroup);
-
-    function createFrontPortrait() {
+  return {
+    createFrontPortrait: () => {
       const canvas = document.createElement('canvas');
       canvas.width = 700; canvas.height = 1100;
       const ctx = canvas.getContext('2d');
@@ -137,21 +93,29 @@ export default function BusinessCard() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 700, 1100);
       
-      ctx.strokeStyle = t.gridColor;
-      for (let i = 0; i < 700; i += 40) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 1100); ctx.stroke(); }
-      for (let i = 0; i < 1100; i += 40) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(700, i); ctx.stroke(); }
+      drawPattern(materialSettings.frontPattern, ctx, 700, 1100, materialSettings.frontPatternSpacing, t.gridColor);
       
       ctx.fillStyle = t.textPrimary;
-      ctx.font = 'bold 72px Segoe UI';
+      const nameSizeFP = calcFontSize(ctx, C.NAME, 520, 72, 36);
+      ctx.font = `bold ${nameSizeFP}px Segoe UI`;
       ctx.fillText(C.NAME, 30, 75);
       
-      ctx.font = 'bold 30px Segoe UI';
+      const titleSizeFP = calcFontSize(ctx, C.TITLE, 520, 30, 18);
+      ctx.font = `bold ${titleSizeFP}px Segoe UI`;
       ctx.fillStyle = t.accentCyan;
       ctx.fillText(C.TITLE, 30, 115);
       
-      ctx.font = 'italic 24px Segoe UI';
+      const taglineSizeFP = calcFontSize(ctx, C.TAGLINE, 520, 24, 14);
+      ctx.font = `italic ${taglineSizeFP}px Segoe UI`;
       ctx.fillStyle = t.accentSecondary;
       ctx.fillText(C.TAGLINE, 30, 152);
+      
+      drawQR(ctx, images.cardQr, 570, 30, 100);
+      ctx.font = 'bold 12px Segoe UI';
+      ctx.fillStyle = t.textHint;
+      ctx.textAlign = 'center';
+      ctx.fillText(C.BUSINESS_CARD_QR_LABEL, 620, 148);
+      ctx.textAlign = 'left';
       
       const divGrad = ctx.createLinearGradient(30, 0, 400, 0);
       divGrad.addColorStop(0, t.accentPrimary);
@@ -161,23 +125,23 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentCyan;
-      ctx.fillText(C.SECTION_EDUCATION, 30, 205);
+      ctx.fillText(C.FRONT_SECTION_1_TITLE, 30, 205);
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.textSecondary;
-      C.EDUCATION.forEach((e, i) => ctx.fillText(e, 30, 235 + i * 27));
+      C.FRONT_SECTION_1_ITEMS.forEach((e, i) => ctx.fillText(e, 30, 235 + i * 27));
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentCyan;
-      ctx.fillText(C.SECTION_WHY_ME, 30, 310);
+      ctx.fillText(C.FRONT_SECTION_2_TITLE, 30, 310);
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.WHY_ME_POINTS.forEach((p, i) => ctx.fillText('› ' + p, 30, 342 + i * 30));
+      C.FRONT_SECTION_2_ITEMS.forEach((p, i) => ctx.fillText('› ' + p, 30, 342 + i * 30));
       
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_LANGUAGES, 30, 480);
+      ctx.fillText(C.SKILL_SET_1_TITLE, 30, 480);
       ctx.font = 'bold 18px Segoe UI';
-      C.LANGUAGES.forEach((l, i) => {
+      C.SKILL_SET_1.forEach((l, i) => {
         const x = 30 + (i % 3) * 215, y = 512 + Math.floor(i / 3) * 38;
         ctx.fillStyle = t.langBg;
         ctx.fillRect(x, y - 17, 205, 32);
@@ -189,9 +153,9 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
-      ctx.fillText(C.SECTION_FRAMEWORKS, 30, 610);
+      ctx.fillText(C.SKILL_SET_2_TITLE, 30, 610);
       ctx.font = 'bold 18px Segoe UI';
-      C.FRAMEWORKS.forEach((f, i) => {
+      C.SKILL_SET_2.forEach((f, i) => {
         const x = 30 + (i % 3) * 215, y = 642 + Math.floor(i / 3) * 38;
         ctx.fillStyle = t.frameworkBg;
         ctx.fillRect(x, y - 17, 205, 32);
@@ -203,9 +167,9 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.accentTertiary;
-      ctx.fillText(C.SECTION_AI, 30, 740);
+      ctx.fillText(C.SKILL_SET_3_TITLE, 30, 740);
       ctx.font = 'bold 18px Segoe UI';
-      C.AI_SKILLS.forEach((a, i) => {
+      C.SKILL_SET_3.forEach((a, i) => {
         const x = 30 + (i % 3) * 215, y = 772 + Math.floor(i / 3) * 38;
         ctx.fillStyle = t.aiBg;
         ctx.fillRect(x, y - 17, 205, 32);
@@ -222,20 +186,15 @@ export default function BusinessCard() {
       ctx.fillStyle = t.ctaText;
       ctx.font = 'bold 28px Segoe UI';
       ctx.textAlign = 'center';
-      ctx.fillText(C.CTA_TEXT, 350, 912);
+      ctx.fillText(C.LOCATION, 350, 912);
       ctx.textAlign = 'left';
       
-      ctx.strokeStyle = t.cornerFront;
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(15, 15); ctx.lineTo(15, 60); ctx.moveTo(15, 15); ctx.lineTo(60, 15); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(685, 15); ctx.lineTo(685, 60); ctx.moveTo(685, 15); ctx.lineTo(640, 15); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(15, 1085); ctx.lineTo(15, 1040); ctx.moveTo(15, 1085); ctx.lineTo(60, 1085); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(685, 1085); ctx.lineTo(685, 1040); ctx.moveTo(685, 1085); ctx.lineTo(640, 1085); ctx.stroke();
+      drawCorners(ctx, t.cornerFront, 700, 1100);
 
       return new THREE.CanvasTexture(canvas);
-    }
+    },
 
-    function createBackPortrait() {
+    createBackPortrait: () => {
       const canvas = document.createElement('canvas');
       canvas.width = 700; canvas.height = 1100;
       const ctx = canvas.getContext('2d');
@@ -246,17 +205,14 @@ export default function BusinessCard() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 700, 1100);
       
-      ctx.strokeStyle = t.circuitColor;
-      for (let i = 0; i < 20; i++) {
-        const x = Math.random() * 700, y = Math.random() * 1100;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.random() * 80 - 40, y); ctx.lineTo(x + Math.random() * 80 - 40, y + Math.random() * 80 - 40); ctx.stroke();
-        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.stroke();
-      }
+      drawPattern(materialSettings.backPattern, ctx, 700, 1100, materialSettings.backPatternSpacing, t.circuitColor);
       
       ctx.fillStyle = t.textPrimary;
-      ctx.font = 'bold 64px Segoe UI';
+      const nameSizeBP = calcFontSize(ctx, C.NAME, 640, 64, 32);
+      ctx.font = `bold ${nameSizeBP}px Segoe UI`;
       ctx.fillText(C.NAME, 30, 75);
-      ctx.font = '28px Segoe UI';
+      const altTitleSizeBP = calcFontSize(ctx, C.ALT_TITLE, 640, 28, 16);
+      ctx.font = `${altTitleSizeBP}px Segoe UI`;
       ctx.fillStyle = t.accentPrimary;
       ctx.fillText(C.ALT_TITLE, 30, 115);
       
@@ -268,7 +224,7 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 26px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_CONNECT, 30, 180);
+      ctx.fillText(C.BACK_SECTION_1_TITLE, 30, 180);
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
       ctx.fillText(C.EMAIL, 30, 215);
@@ -276,63 +232,47 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 26px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_ONLINE, 30, 300);
+      ctx.fillText(C.BACK_SECTION_2_TITLE, 30, 300);
       ctx.font = 'bold 21px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      ctx.fillText(C.LINKEDIN, 30, 333);
-      ctx.fillText(C.GITHUB, 30, 363);
-      ctx.fillText(C.PORTFOLIO_URL, 30, 393);
+      C.ONLINE_LINKS.forEach((link, i) => ctx.fillText(link, 30, 333 + i * 30));
       
       ctx.font = 'bold 26px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_WHAT_I_BRING, 30, 450);
+      ctx.fillText(C.BACK_SECTION_3_TITLE, 30, 450);
       ctx.font = 'bold 21px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.WHAT_I_BRING.forEach((b, i) => ctx.fillText('› ' + b, 30, 485 + i * 34));
+      C.BACK_SECTION_3_ITEMS.forEach((b, i) => ctx.fillText('› ' + b, 30, 485 + i * 34));
       
       ctx.font = 'bold 26px Segoe UI';
       ctx.fillStyle = t.accentTertiary;
-      ctx.fillText(C.SECTION_SPECIALIZATIONS, 30, 635);
+      ctx.fillText(C.BACK_SECTION_4_TITLE, 30, 635);
       ctx.font = 'bold 21px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.SPECIALIZATIONS.forEach((s, i) => ctx.fillText('› ' + s, 30, 670 + i * 34));
+      C.BACK_SECTION_4_ITEMS.forEach((s, i) => ctx.fillText('› ' + s, 30, 670 + i * 34));
       
       ctx.font = 'bold 26px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
-      ctx.fillText(C.SECTION_CERTIFICATIONS, 30, 820);
+      ctx.fillText(C.BACK_SECTION_5_TITLE, 30, 820);
       ctx.font = 'bold 21px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.CERTIFICATIONS.forEach((c, i) => ctx.fillText('› ' + c, 30, 855 + i * 34));
+      C.BACK_SECTION_5_ITEMS.forEach((c, i) => ctx.fillText('› ' + c, 30, 855 + i * 34));
       
-      ctx.strokeStyle = t.glassesColor;
-      ctx.lineWidth = 5;
-      ctx.beginPath();
-      ctx.roundRect(420, 160, 120, 60, 12);
-      ctx.roundRect(560, 160, 120, 60, 12);
-      ctx.moveTo(540, 190); ctx.lineTo(560, 190);
-      ctx.stroke();
-      ctx.fillStyle = t.glassesFill;
-      ctx.fillRect(430, 170, 100, 40);
-      ctx.fillRect(570, 170, 100, 40);
+      drawLogo(ctx, 'portrait', t.glassesColor, t.glassesFill, images.logo);
       
-      drawQR(ctx, 520, 750, 150);
+      drawQR(ctx, images.linkQr, 520, 750, 150);
       ctx.font = 'bold 18px Segoe UI';
       ctx.fillStyle = t.textHint;
       ctx.textAlign = 'center';
-      ctx.fillText(C.QR_LABEL, 595, 920);
+      ctx.fillText(C.LINK_QR_LABEL, 595, 920);
       ctx.textAlign = 'left';
       
-      ctx.strokeStyle = t.cornerBack;
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(15, 15); ctx.lineTo(15, 60); ctx.moveTo(15, 15); ctx.lineTo(60, 15); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(685, 15); ctx.lineTo(685, 60); ctx.moveTo(685, 15); ctx.lineTo(640, 15); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(15, 1085); ctx.lineTo(15, 1040); ctx.moveTo(15, 1085); ctx.lineTo(60, 1085); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(685, 1085); ctx.lineTo(685, 1040); ctx.moveTo(685, 1085); ctx.lineTo(640, 1085); ctx.stroke();
+      drawCorners(ctx, t.cornerBack, 700, 1100);
 
       return new THREE.CanvasTexture(canvas);
-    }
+    },
 
-    function createFrontLandscape() {
+    createFrontLandscape: () => {
       const canvas = document.createElement('canvas');
       canvas.width = 1400; canvas.height = 820;
       const ctx = canvas.getContext('2d');
@@ -344,21 +284,29 @@ export default function BusinessCard() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 1400, 820);
       
-      ctx.strokeStyle = t.gridColor;
-      for (let i = 0; i < 1400; i += 50) { ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 820); ctx.stroke(); }
-      for (let i = 0; i < 820; i += 50) { ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(1400, i); ctx.stroke(); }
+      drawPattern(materialSettings.frontPattern, ctx, 1400, 820, materialSettings.frontPatternSpacing, t.gridColor);
       
       ctx.fillStyle = t.textPrimary;
-      ctx.font = 'bold 88px Segoe UI';
+      const nameSizeFL = calcFontSize(ctx, C.NAME, 1180, 88, 44);
+      ctx.font = `bold ${nameSizeFL}px Segoe UI`;
       ctx.fillText(C.NAME, 50, 140);
       
-      ctx.font = 'bold 32px Segoe UI';
+      const titleSizeFL = calcFontSize(ctx, C.TITLE, 1180, 32, 20);
+      ctx.font = `bold ${titleSizeFL}px Segoe UI`;
       ctx.fillStyle = t.accentCyan;
       ctx.fillText(C.TITLE, 50, 185);
       
-      ctx.font = 'italic 26px Segoe UI';
+      const taglineSizeFL = calcFontSize(ctx, C.TAGLINE, 1180, 26, 16);
+      ctx.font = `italic ${taglineSizeFL}px Segoe UI`;
       ctx.fillStyle = t.accentSecondary;
       ctx.fillText(C.TAGLINE, 50, 225);
+      
+      drawQR(ctx, images.cardQr, 1260, 30, 110);
+      ctx.font = 'bold 14px Segoe UI';
+      ctx.fillStyle = t.textHint;
+      ctx.textAlign = 'center';
+      ctx.fillText(C.BUSINESS_CARD_QR_LABEL, 1315, 158);
+      ctx.textAlign = 'left';
       
       const divGrad = ctx.createLinearGradient(50, 0, 500, 0);
       divGrad.addColorStop(0, t.accentPrimary);
@@ -369,17 +317,17 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.accentCyan;
-      ctx.fillText(C.SECTION_EDUCATION, 50, 290);
+      ctx.fillText(C.FRONT_SECTION_1_TITLE, 50, 290);
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.textSecondary;
-      C.EDUCATION_FULL.forEach((e, i) => ctx.fillText(e, 50, 325 + i * 30));
+      C.FRONT_SECTION_1_ITEMS.forEach((e, i) => ctx.fillText(e, 50, 325 + i * 30));
       
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.accentCyan;
-      ctx.fillText(C.SECTION_WHY_ME, 50, 405);
+      ctx.fillText(C.FRONT_SECTION_2_TITLE, 50, 405);
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.WHY_ME_POINTS.forEach((p, i) => ctx.fillText('› ' + p, 50, 440 + i * 32));
+      C.FRONT_SECTION_2_ITEMS.forEach((p, i) => ctx.fillText('› ' + p, 50, 440 + i * 32));
       
       ctx.fillStyle = t.ctaBg;
       ctx.beginPath();
@@ -388,15 +336,15 @@ export default function BusinessCard() {
       ctx.fillStyle = t.ctaText;
       ctx.font = 'bold 26px Segoe UI';
       ctx.textAlign = 'center';
-      ctx.fillText(C.CTA_TEXT, 210, 608);
+      ctx.fillText(C.LOCATION, 210, 608);
       ctx.textAlign = 'left';
       
       const techX = 720;
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_LANGUAGES, techX, 290);
+      ctx.fillText(C.SKILL_SET_1_TITLE, techX, 290);
       ctx.font = 'bold 18px Segoe UI';
-      C.LANGUAGES_FULL.forEach((l, i) => {
+      C.SKILL_SET_1.forEach((l, i) => {
         const x = techX + (i % 3) * 220, y = 320 + Math.floor(i / 3) * 42;
         ctx.fillStyle = t.langBg;
         ctx.fillRect(x, y - 18, 205, 34);
@@ -408,9 +356,9 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
-      ctx.fillText(C.SECTION_FRAMEWORKS, techX, 430);
+      ctx.fillText(C.SKILL_SET_2_TITLE, techX, 430);
       ctx.font = 'bold 18px Segoe UI';
-      C.FRAMEWORKS.forEach((f, i) => {
+      C.SKILL_SET_2.forEach((f, i) => {
         const x = techX + (i % 3) * 220, y = 460 + Math.floor(i / 3) * 42;
         ctx.fillStyle = t.frameworkBg;
         ctx.fillRect(x, y - 18, 205, 34);
@@ -422,9 +370,9 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.accentTertiary;
-      ctx.fillText(C.SECTION_AI, techX, 570);
+      ctx.fillText(C.SKILL_SET_3_TITLE, techX, 570);
       ctx.font = 'bold 18px Segoe UI';
-      C.AI_SKILLS.forEach((a, i) => {
+      C.SKILL_SET_3.forEach((a, i) => {
         const x = techX + (i % 3) * 220, y = 600 + Math.floor(i / 3) * 42;
         ctx.fillStyle = t.aiBg;
         ctx.fillRect(x, y - 18, 205, 34);
@@ -434,17 +382,12 @@ export default function BusinessCard() {
         ctx.fillText(a, x + 14, y + 6);
       });
       
-      ctx.strokeStyle = t.cornerFront;
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(20, 20); ctx.lineTo(20, 80); ctx.moveTo(20, 20); ctx.lineTo(80, 20); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(1380, 20); ctx.lineTo(1380, 80); ctx.moveTo(1380, 20); ctx.lineTo(1320, 20); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(20, 800); ctx.lineTo(20, 740); ctx.moveTo(20, 800); ctx.lineTo(80, 800); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(1380, 800); ctx.lineTo(1380, 740); ctx.moveTo(1380, 800); ctx.lineTo(1320, 800); ctx.stroke();
+      drawCorners(ctx, t.cornerFront, 1400, 820, 20, 60, 4);
 
       return new THREE.CanvasTexture(canvas);
-    }
+    },
 
-    function createBackLandscape() {
+    createBackLandscape: () => {
       const canvas = document.createElement('canvas');
       canvas.width = 1400; canvas.height = 820;
       const ctx = canvas.getContext('2d');
@@ -455,17 +398,14 @@ export default function BusinessCard() {
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, 1400, 820);
       
-      ctx.strokeStyle = t.circuitColor;
-      for (let i = 0; i < 30; i++) {
-        const x = Math.random() * 1400, y = Math.random() * 820;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.random() * 140 - 70, y); ctx.lineTo(x + Math.random() * 140 - 70, y + Math.random() * 140 - 70); ctx.stroke();
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke();
-      }
+      drawPattern(materialSettings.backPattern, ctx, 1400, 820, materialSettings.backPatternSpacing, t.circuitColor);
       
       ctx.fillStyle = t.textPrimary;
-      ctx.font = 'bold 72px Segoe UI';
+      const nameSizeBL = calcFontSize(ctx, C.NAME, 580, 72, 36);
+      ctx.font = `bold ${nameSizeBL}px Segoe UI`;
       ctx.fillText(C.NAME, 50, 100);
-      ctx.font = '28px Segoe UI';
+      const altTitleSizeBL = calcFontSize(ctx, C.ALT_TITLE, 580, 28, 16);
+      ctx.font = `${altTitleSizeBL}px Segoe UI`;
       ctx.fillStyle = t.accentPrimary;
       ctx.fillText(C.ALT_TITLE, 50, 145);
       
@@ -477,7 +417,7 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_CONNECT, 50, 215);
+      ctx.fillText(C.BACK_SECTION_1_TITLE, 50, 215);
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
       ctx.fillText(C.EMAIL, 50, 258);
@@ -485,202 +425,331 @@ export default function BusinessCard() {
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_ONLINE, 50, 355);
+      ctx.fillText(C.BACK_SECTION_2_TITLE, 50, 355);
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      ctx.fillText(C.LINKEDIN, 50, 395);
-      ctx.fillText(C.GITHUB, 50, 432);
-      ctx.fillText(C.PORTFOLIO_URL, 50, 469);
+      C.ONLINE_LINKS.forEach((link, i) => ctx.fillText(link, 50, 395 + i * 37));
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentSecondary;
-      ctx.fillText(C.SECTION_WHAT_I_BRING, 50, 535);
+      ctx.fillText(C.BACK_SECTION_3_TITLE, 50, 535);
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.WHAT_I_BRING.forEach((b, i) => ctx.fillText('› ' + b, 50, 575 + i * 38));
+      C.BACK_SECTION_3_ITEMS.forEach((b, i) => ctx.fillText('› ' + b, 50, 575 + i * 38));
       
-      ctx.strokeStyle = t.glassesColor;
-      ctx.lineWidth = 6;
-      ctx.beginPath();
-      ctx.roundRect(700, 180, 180, 90, 16);
-      ctx.roundRect(910, 180, 180, 90, 16);
-      ctx.moveTo(880, 225); ctx.lineTo(910, 225);
-      ctx.moveTo(700, 225); ctx.lineTo(660, 208);
-      ctx.moveTo(1090, 225); ctx.lineTo(1130, 208);
-      ctx.stroke();
-      ctx.fillStyle = t.glassesFill;
-      ctx.fillRect(715, 195, 150, 60);
-      ctx.fillRect(925, 195, 150, 60);
+      drawLogo(ctx, 'landscape', t.glassesColor, t.glassesFill, images.logo);
       
-      ctx.font = 'italic 24px Segoe UI';
+      const altTaglineSizeBL = calcFontSize(ctx, C.ALT_TAGLINE, 500, 24, 14);
+      ctx.font = `italic ${altTaglineSizeBL}px Segoe UI`;
       ctx.fillStyle = t.textHint;
       ctx.fillText(C.ALT_TAGLINE, 650, 330);
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentTertiary;
-      ctx.fillText(C.SECTION_SPECIALIZATIONS, 650, 400);
+      ctx.fillText(C.BACK_SECTION_4_TITLE, 650, 400);
       ctx.font = 'bold 22px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.SPECIALIZATIONS.forEach((s, i) => ctx.fillText('› ' + s, 650, 442 + i * 38));
+      C.BACK_SECTION_4_ITEMS.forEach((s, i) => ctx.fillText('› ' + s, 650, 442 + i * 38));
       
       ctx.font = 'bold 24px Segoe UI';
       ctx.fillStyle = t.accentPrimary;
-      ctx.fillText(C.SECTION_CERTIFICATIONS, 650, 620);
+      ctx.fillText(C.BACK_SECTION_5_TITLE, 650, 620);
       ctx.font = 'bold 20px Segoe UI';
       ctx.fillStyle = t.textMuted;
-      C.CERTIFICATIONS.forEach((c, i) => ctx.fillText('› ' + c, 650, 658 + i * 34));
+      C.BACK_SECTION_5_ITEMS.forEach((c, i) => ctx.fillText('› ' + c, 650, 658 + i * 34));
       
-      drawQR(ctx, 1180, 550, 160);
+      drawQR(ctx, images.linkQr, 1180, 550, 160);
       ctx.font = 'bold 16px Segoe UI';
       ctx.fillStyle = t.textHint;
-      ctx.fillText(C.QR_LABEL, 1215, 735);
+      ctx.textAlign = 'center';
+      ctx.fillText(C.LINK_QR_LABEL, 1260, 735);
+      ctx.textAlign = 'left';
       
-      ctx.strokeStyle = t.cornerBack;
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(20, 20); ctx.lineTo(20, 80); ctx.moveTo(20, 20); ctx.lineTo(80, 20); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(1380, 20); ctx.lineTo(1380, 80); ctx.moveTo(1380, 20); ctx.lineTo(1320, 20); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(20, 800); ctx.lineTo(20, 740); ctx.moveTo(20, 800); ctx.lineTo(80, 800); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(1380, 800); ctx.lineTo(1380, 740); ctx.moveTo(1380, 800); ctx.lineTo(1320, 800); ctx.stroke();
+      drawCorners(ctx, t.cornerBack, 1400, 820, 20, 60, 4);
 
       return new THREE.CanvasTexture(canvas);
     }
+  };
+}
 
-    let card, edges;
+// ============ MAIN COMPONENT ============
+export default function BusinessCard() {
+  const containerRef = useRef(null);
+  const [isDark, setIsDark] = useState(true);
+  const [showSaved, setShowSaved] = useState(false);
+  
+  // Refs for Three.js objects - persist across renders
+  const threeRef = useRef({
+    renderer: null,
+    scene: null,
+    camera: null,
+    cardGroup: null,
+    card: null,
+    edges: null,
+    lights: { ambient: null, point1: null, point2: null },
+    orbs: [],
+    textures: { front: null, back: null },
+    animationId: null,
+    isInitialized: false,
+  });
+  
+  // Animation state refs - avoid recreating functions
+  const stateRef = useRef({
+    isDragging: false,
+    prevX: 0,
+    prevY: 0,
+    targetRotX: 0.1,
+    targetRotY: 0,
+    time: 0,
+    lastTouchDist: 0,
+    lastTapTime: 0,
+    isPortrait: true,
+  });
+  
+  // Images ref
+  const imagesRef = useRef({ linkQr: null, cardQr: null, logo: null });
+  const imagesLoadedRef = useRef(false);
+  
+  // Rebuild trigger ref
+  const needsRebuildRef = useRef(false);
+  
+  const theme = isDark ? darkTheme : lightTheme;
+  
+  // Memoized particles - created once
+  const particles = useMemo(() => 
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 15,
+      duration: 15 + Math.random() * 10
+    })), []
+  );
 
-    function rebuildCard() {
-      if (card) { cardGroup.remove(card); cardGroup.remove(edges); }
-      
-      const portrait = isPortrait();
-      const cw = portrait ? 2.0 : 3.6;
-      const ch = portrait ? 3.2 : 2.2;
-      
-      const cardGeo = new THREE.BoxGeometry(cw, ch, 0.08);
-      const sideMat = new THREE.MeshStandardMaterial({ color: t.cardSide, metalness: t.sideMetalness, roughness: t.sideRoughness });
-      const materials = [
-        sideMat, sideMat, sideMat, sideMat,
-        new THREE.MeshStandardMaterial({ map: portrait ? createFrontPortrait() : createFrontLandscape(), metalness: t.cardMetalness, roughness: t.cardRoughness }),
-        new THREE.MeshStandardMaterial({ map: portrait ? createBackPortrait() : createBackLandscape(), metalness: t.cardMetalness, roughness: t.cardRoughness })
-      ];
-      card = new THREE.Mesh(cardGeo, materials);
-      cardGroup.add(card);
-      
-      const edgeGeo = new THREE.EdgesGeometry(cardGeo);
-      const edgeMat = new THREE.LineBasicMaterial({ color: t.edgeColor, transparent: true, opacity: 0.6 });
-      edges = new THREE.LineSegments(edgeGeo, edgeMat);
-      cardGroup.add(edges);
-    }
+  // Load images once on mount
+  useEffect(() => {
+    if (imagesLoadedRef.current) return;
+    imagesLoadedRef.current = true;
+    
+    const loadImage = (url) => new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+    
+    // Load QR codes with neutral colors (will work for both themes)
+    Promise.all([
+      loadImage(`${C.LINK_QR_URL}&bgcolor=ffffff&color=000000`),
+      loadImage(`${C.BUSINESS_CARD_QR_URL}&bgcolor=ffffff&color=000000`),
+      logoSettings.source === 'custom' && logoSettings.customLogoPath 
+        ? loadImage(logoSettings.customLogoPath) 
+        : Promise.resolve(null)
+    ]).then(([linkQr, cardQr, logo]) => {
+      imagesRef.current = { linkQr, cardQr, logo };
+      needsRebuildRef.current = true;
+    });
+  }, []);
 
-    rebuildCard();
-
-    const orbGeo = new THREE.SphereGeometry(0.05, 16, 16);
-    const orbs = [];
-    for (let i = 0; i < 8; i++) {
-      const orbMat = new THREE.MeshBasicMaterial({ color: i % 2 ? t.orbColor1 : t.orbColor2, transparent: true, opacity: 0.7 });
+  // Initialize Three.js scene ONCE
+  useEffect(() => {
+    if (!containerRef.current || threeRef.current.isInitialized) return;
+    
+    const container = containerRef.current;
+    const three = threeRef.current;
+    const state = stateRef.current;
+    
+    let W = container.clientWidth;
+    let H = container.clientHeight;
+    
+    const isPortrait = () => W < 768 || W < H;
+    state.isPortrait = isPortrait();
+    
+    // Scene
+    three.scene = new THREE.Scene();
+    three.cardGroup = new THREE.Group();
+    three.scene.add(three.cardGroup);
+    
+    // Camera
+    three.camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 1000);
+    three.camera.position.z = isPortrait() ? 4.5 : 3.0;
+    
+    // Renderer
+    three.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    three.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    three.renderer.setSize(W, H);
+    container.appendChild(three.renderer.domElement);
+    
+    // Lights (colors will be set in theme effect)
+    three.lights.ambient = new THREE.AmbientLight(0xffffff, materialSettings.ambientIntensity);
+    three.scene.add(three.lights.ambient);
+    
+    three.lights.point1 = new THREE.PointLight(0xffffff, materialSettings.point1Intensity, 10);
+    three.lights.point1.position.set(2, 2, 3);
+    three.scene.add(three.lights.point1);
+    
+    three.lights.point2 = new THREE.PointLight(0xffffff, materialSettings.point2Intensity, 10);
+    three.lights.point2.position.set(-2, -1, 2);
+    three.scene.add(three.lights.point2);
+    
+    // Orbs
+    const orbGeo = new THREE.SphereGeometry(0.05, 8, 8);
+    for (let i = 0; i < 6; i++) {
+      const orbMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.7 });
       const orb = new THREE.Mesh(orbGeo, orbMat);
-      orb.position.set((Math.random() - 0.5) * 4, (Math.random() - 0.5) * 3, (Math.random() - 0.5) * 2);
+      orb.position.set(
+        (Math.random() - 0.5) * 4,
+        (Math.random() - 0.5) * 3,
+        (Math.random() - 0.5) * 2
+      );
       orb.userData = { speed: 0.5 + Math.random(), offset: Math.random() * Math.PI * 2 };
-      scene.add(orb);
-      orbs.push(orb);
+      three.scene.add(orb);
+      three.orbs.push(orb);
     }
-
-    let isDragging = false, prevX = 0, prevY = 0;
-    let targetRotX = 0.1, targetRotY = 0;
-
-    const onMouseDown = (e) => { isDragging = true; prevX = e.clientX; prevY = e.clientY; };
-    const onMouseMove = (e) => {
-      if (!isDragging) return;
-      targetRotY += (e.clientX - prevX) * 0.01;
-      targetRotX += (e.clientY - prevY) * 0.01;
-      targetRotX = Math.max(-0.5, Math.min(0.5, targetRotX));
-      prevX = e.clientX; prevY = e.clientY;
+    
+    // Event handlers - defined once, use refs for state
+    const onMouseDown = (e) => {
+      state.isDragging = true;
+      state.prevX = e.clientX;
+      state.prevY = e.clientY;
     };
-    const onMouseUp = () => isDragging = false;
+    
+    const onMouseMove = (e) => {
+      if (!state.isDragging) return;
+      state.targetRotY += (e.clientX - state.prevX) * 0.01;
+      state.targetRotX += (e.clientY - state.prevY) * 0.01;
+      state.targetRotX = Math.max(-0.5, Math.min(0.5, state.targetRotX));
+      state.prevX = e.clientX;
+      state.prevY = e.clientY;
+    };
+    
+    const onMouseUp = () => { state.isDragging = false; };
+    
     let touchHandled = false;
-    const onClick = (e) => { 
+    const onClick = (e) => {
       if (touchHandled) { touchHandled = false; return; }
-      if (Math.abs(e.clientX - prevX) < 5) {
-        targetRotY += Math.PI;
+      if (Math.abs(e.clientX - state.prevX) < 5) {
+        state.targetRotY += Math.PI;
         trackCardFlip();
       }
     };
-    const onWheel = (e) => { e.preventDefault(); camera.position.z = Math.max(2.0, Math.min(8, camera.position.z + e.deltaY * 0.005)); };
-
-    let lastTouchDist = 0, lastTapTime = 0;
-    const onTouchStart = (e) => {
-      if (e.touches.length === 1) { isDragging = true; prevX = e.touches[0].clientX; prevY = e.touches[0].clientY; }
-      else if (e.touches.length === 2) lastTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-    };
-    const onTouchMove = (e) => {
+    
+    const onWheel = (e) => {
       e.preventDefault();
-      if (e.touches.length === 1 && isDragging) {
-        targetRotY += (e.touches[0].clientX - prevX) * 0.01;
-        targetRotX += (e.touches[0].clientY - prevY) * 0.01;
-        targetRotX = Math.max(-0.5, Math.min(0.5, targetRotX));
-        prevX = e.touches[0].clientX; prevY = e.touches[0].clientY;
+      three.camera.position.z = Math.max(2.0, Math.min(8, three.camera.position.z + e.deltaY * 0.005));
+    };
+    
+    const onTouchStart = (e) => {
+      if (e.touches.length === 1) {
+        state.isDragging = true;
+        state.prevX = e.touches[0].clientX;
+        state.prevY = e.touches[0].clientY;
       } else if (e.touches.length === 2) {
-        const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
-        camera.position.z = Math.max(2.0, Math.min(8, camera.position.z + (lastTouchDist - dist) * 0.02));
-        lastTouchDist = dist;
+        state.lastTouchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
       }
     };
+    
+    const onTouchMove = (e) => {
+      e.preventDefault();
+      if (e.touches.length === 1 && state.isDragging) {
+        state.targetRotY += (e.touches[0].clientX - state.prevX) * 0.01;
+        state.targetRotX += (e.touches[0].clientY - state.prevY) * 0.01;
+        state.targetRotX = Math.max(-0.5, Math.min(0.5, state.targetRotX));
+        state.prevX = e.touches[0].clientX;
+        state.prevY = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        three.camera.position.z = Math.max(2.0, Math.min(8, three.camera.position.z + (state.lastTouchDist - dist) * 0.02));
+        state.lastTouchDist = dist;
+      }
+    };
+    
     const onTouchEnd = (e) => {
       if (e.touches.length === 0) {
         const now = Date.now();
-        if (isDragging && Math.abs(e.changedTouches[0].clientX - prevX) < 10 && Math.abs(e.changedTouches[0].clientY - prevY) < 10 && now - lastTapTime > 400) {
-          targetRotY += Math.PI;
+        const touch = e.changedTouches[0];
+        if (state.isDragging && 
+            Math.abs(touch.clientX - state.prevX) < 10 && 
+            Math.abs(touch.clientY - state.prevY) < 10 && 
+            now - state.lastTapTime > 400) {
+          state.targetRotY += Math.PI;
           trackCardFlip();
           touchHandled = true;
-          lastTapTime = now;
+          state.lastTapTime = now;
         }
-        isDragging = false;
+        state.isDragging = false;
       }
     };
-
+    
+    // Debounced resize handler
+    let resizeTimeout;
+    const onResize = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        W = container.clientWidth;
+        H = container.clientHeight;
+        three.camera.aspect = W / H;
+        three.camera.position.z = isPortrait() ? 4.5 : 3.0;
+        three.camera.updateProjectionMatrix();
+        three.renderer.setSize(W, H);
+        
+        if (isPortrait() !== state.isPortrait) {
+          state.isPortrait = isPortrait();
+          needsRebuildRef.current = true;
+        }
+      }, 100);
+    };
+    
+    // Add event listeners
     container.addEventListener('mousedown', onMouseDown);
     container.addEventListener('mousemove', onMouseMove);
     container.addEventListener('mouseup', onMouseUp);
     container.addEventListener('mouseleave', onMouseUp);
     container.addEventListener('click', onClick);
     container.addEventListener('wheel', onWheel, { passive: false });
-    container.addEventListener('touchstart', onTouchStart);
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
     container.addEventListener('touchmove', onTouchMove, { passive: false });
-    container.addEventListener('touchend', onTouchEnd);
-
-    let time = 0, lastPortrait = isPortrait();
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('resize', onResize);
     
-    function animate() {
-      animationRef.current = requestAnimationFrame(animate);
-      time += 0.016;
+    // Animation loop
+    const animate = () => {
+      three.animationId = requestAnimationFrame(animate);
+      state.time += 0.016;
       
-      cardGroup.rotation.x += (targetRotX - cardGroup.rotation.x) * 0.08;
-      cardGroup.rotation.y += (targetRotY - cardGroup.rotation.y) * 0.08;
-      cardGroup.position.y = Math.sin(time) * 0.05;
+      if (three.cardGroup) {
+        three.cardGroup.rotation.x += (state.targetRotX - three.cardGroup.rotation.x) * 0.08;
+        three.cardGroup.rotation.y += (state.targetRotY - three.cardGroup.rotation.y) * 0.08;
+        three.cardGroup.position.y = Math.sin(state.time) * 0.05;
+      }
       
-      point1.position.x = Math.sin(time * 0.5) * 3;
-      point1.position.y = Math.cos(time * 0.5) * 2;
+      if (three.lights.point1) {
+        three.lights.point1.position.x = Math.sin(state.time * 0.5) * 3;
+        three.lights.point1.position.y = Math.cos(state.time * 0.5) * 2;
+      }
       
-      orbs.forEach(o => { 
-        o.position.y += Math.sin(time * o.userData.speed + o.userData.offset) * 0.002; 
-        o.position.x += Math.cos(time * o.userData.speed * 0.5 + o.userData.offset) * 0.001; 
+      three.orbs.forEach(o => {
+        o.position.y += Math.sin(state.time * o.userData.speed + o.userData.offset) * 0.002;
+        o.position.x += Math.cos(state.time * o.userData.speed * 0.5 + o.userData.offset) * 0.001;
       });
       
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    const onResize = () => {
-      W = container.clientWidth; H = container.clientHeight;
-      camera.aspect = W / H;
-      camera.position.z = getCameraZ();
-      camera.updateProjectionMatrix();
-      renderer.setSize(W, H);
-      if (isPortrait() !== lastPortrait) { lastPortrait = isPortrait(); rebuildCard(); }
+      three.renderer.render(three.scene, three.camera);
     };
-    window.addEventListener('resize', onResize);
-
+    animate();
+    
+    three.isInitialized = true;
+    
+    // Cleanup
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(three.animationId);
+      clearTimeout(resizeTimeout);
+      
       container.removeEventListener('mousedown', onMouseDown);
       container.removeEventListener('mousemove', onMouseMove);
       container.removeEventListener('mouseup', onMouseUp);
@@ -690,11 +759,198 @@ export default function BusinessCard() {
       container.removeEventListener('touchstart', onTouchStart);
       container.removeEventListener('touchmove', onTouchMove);
       container.removeEventListener('touchend', onTouchEnd);
-      if (rendererRef.current) {
-        rendererRef.current.dispose();
-        if (container.contains(rendererRef.current.domElement)) container.removeChild(rendererRef.current.domElement);
+      window.removeEventListener('resize', onResize);
+      
+      // Dispose Three.js resources
+      if (three.renderer) {
+        three.renderer.dispose();
+        if (three.renderer.domElement && three.renderer.domElement.parentNode) {
+          three.renderer.domElement.parentNode.removeChild(three.renderer.domElement);
+        }
       }
+      three.textures.front?.dispose();
+      three.textures.back?.dispose();
+      if (three.card) {
+        three.card.geometry.dispose();
+        three.card.material.forEach(m => m.dispose());
+      }
+      if (three.edges) {
+        three.edges.geometry.dispose();
+        three.edges.material.dispose();
+      }
+      three.orbs.forEach(o => {
+        o.geometry.dispose();
+        o.material.dispose();
+      });
+      
+      three.isInitialized = false;
     };
+  }, []); // Empty deps - runs once on mount
+
+  // Update theme colors and rebuild card when theme changes
+  useEffect(() => {
+    const three = threeRef.current;
+    const state = stateRef.current;
+    
+    if (!three.isInitialized) return;
+    
+    const t = isDark ? darkTheme : lightTheme;
+    
+    // Update light colors (no rebuild needed)
+    three.lights.point1.color.setHex(t.lightColor1);
+    three.lights.point2.color.setHex(t.lightColor2);
+    
+    // Update orb colors (no rebuild needed)
+    three.orbs.forEach((orb, i) => {
+      orb.material.color.setHex(i % 2 ? t.orbColor1 : t.orbColor2);
+    });
+    
+    // Rebuild card with new theme
+    const rebuildCard = () => {
+      // Dispose old textures
+      three.textures.front?.dispose();
+      three.textures.back?.dispose();
+      
+      // Remove old card
+      if (three.card) {
+        three.cardGroup.remove(three.card);
+        three.card.geometry.dispose();
+        three.card.material.forEach(m => m.dispose());
+      }
+      if (three.edges) {
+        three.cardGroup.remove(three.edges);
+        three.edges.geometry.dispose();
+        three.edges.material.dispose();
+      }
+      
+      const portrait = state.isPortrait;
+      const cw = portrait ? 2.0 : 3.6;
+      const ch = portrait ? 3.2 : 2.2;
+      
+      const mat = getMaterialValues(materialSettings);
+      const factory = createTextureFactory(t, imagesRef.current);
+      
+      const frontTex = portrait ? factory.createFrontPortrait() : factory.createFrontLandscape();
+      const backTex = portrait ? factory.createBackPortrait() : factory.createBackLandscape();
+      three.textures = { front: frontTex, back: backTex };
+      
+      const cardGeo = new THREE.BoxGeometry(cw, ch, 0.08);
+      const sideMat = new THREE.MeshStandardMaterial({
+        color: t.cardSide,
+        metalness: mat.sideMetalness,
+        roughness: mat.sideRoughness
+      });
+      
+      const materials = [
+        sideMat, sideMat, sideMat, sideMat,
+        new THREE.MeshStandardMaterial({
+          map: frontTex,
+          metalness: mat.cardMetalness,
+          roughness: mat.cardRoughness
+        }),
+        new THREE.MeshStandardMaterial({
+          map: backTex,
+          metalness: mat.cardMetalness,
+          roughness: mat.cardRoughness
+        })
+      ];
+      
+      three.card = new THREE.Mesh(cardGeo, materials);
+      three.cardGroup.add(three.card);
+      
+      const edgeGeo = new THREE.EdgesGeometry(cardGeo);
+      const edgeMat = new THREE.LineBasicMaterial({
+        color: t.edgeColor,
+        transparent: true,
+        opacity: 0.6
+      });
+      three.edges = new THREE.LineSegments(edgeGeo, edgeMat);
+      three.cardGroup.add(three.edges);
+      
+      needsRebuildRef.current = false;
+    };
+    
+    // Debounce the rebuild slightly
+    const timeoutId = setTimeout(rebuildCard, 50);
+    
+    return () => clearTimeout(timeoutId);
+  }, [isDark]);
+
+  // Check for rebuild needs (from resize or image load)
+  useEffect(() => {
+    const checkRebuild = setInterval(() => {
+      if (needsRebuildRef.current && threeRef.current.isInitialized) {
+        // Trigger rebuild by toggling a dummy state or dispatch event
+        const t = isDark ? darkTheme : lightTheme;
+        const three = threeRef.current;
+        const state = stateRef.current;
+        
+        // Dispose and rebuild
+        three.textures.front?.dispose();
+        three.textures.back?.dispose();
+        
+        if (three.card) {
+          three.cardGroup.remove(three.card);
+          three.card.geometry.dispose();
+          three.card.material.forEach(m => m.dispose());
+        }
+        if (three.edges) {
+          three.cardGroup.remove(three.edges);
+          three.edges.geometry.dispose();
+          three.edges.material.dispose();
+        }
+        
+        const portrait = state.isPortrait;
+        const cw = portrait ? 2.0 : 3.6;
+        const ch = portrait ? 3.2 : 2.2;
+        
+        const mat = getMaterialValues(materialSettings);
+        const factory = createTextureFactory(t, imagesRef.current);
+        
+        const frontTex = portrait ? factory.createFrontPortrait() : factory.createFrontLandscape();
+        const backTex = portrait ? factory.createBackPortrait() : factory.createBackLandscape();
+        three.textures = { front: frontTex, back: backTex };
+        
+        const cardGeo = new THREE.BoxGeometry(cw, ch, 0.08);
+        const sideMat = new THREE.MeshStandardMaterial({
+          color: t.cardSide,
+          metalness: mat.sideMetalness,
+          roughness: mat.sideRoughness
+        });
+        
+        const materials = [
+          sideMat, sideMat, sideMat, sideMat,
+          new THREE.MeshStandardMaterial({ map: frontTex, metalness: mat.cardMetalness, roughness: mat.cardRoughness }),
+          new THREE.MeshStandardMaterial({ map: backTex, metalness: mat.cardMetalness, roughness: mat.cardRoughness })
+        ];
+        
+        three.card = new THREE.Mesh(cardGeo, materials);
+        three.cardGroup.add(three.card);
+        
+        const edgeGeo = new THREE.EdgesGeometry(cardGeo);
+        const edgeMat = new THREE.LineBasicMaterial({ color: t.edgeColor, transparent: true, opacity: 0.6 });
+        three.edges = new THREE.LineSegments(edgeGeo, edgeMat);
+        three.cardGroup.add(three.edges);
+        
+        needsRebuildRef.current = false;
+      }
+    }, 100);
+    
+    return () => clearInterval(checkRebuild);
+  }, [isDark]);
+
+  // Memoized handlers
+  const handleDownload = useCallback(() => {
+    downloadVCard();
+    trackContactDownload();
+    setShowSaved(true);
+    setTimeout(() => setShowSaved(false), 2000);
+  }, []);
+
+  const handleThemeToggle = useCallback(() => {
+    const newTheme = !isDark ? 'dark' : 'light';
+    setIsDark(!isDark);
+    trackThemeToggle(newTheme);
   }, [isDark]);
 
   const bgGradient = isDark 
@@ -702,19 +958,49 @@ export default function BusinessCard() {
     : 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #f8fafc 100%)';
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative', background: bgGradient }}>
-      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 0 }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      overflow: 'hidden', 
+      position: 'relative', 
+      background: bgGradient 
+    }}>
+      {/* Particles Background */}
+      <div style={{ 
+        position: 'fixed', 
+        top: 0, 
+        left: 0, 
+        right: 0, 
+        bottom: 0, 
+        pointerEvents: 'none', 
+        overflow: 'hidden', 
+        zIndex: 0 
+      }}>
         {particles.map(p => (
-          <div key={p.id} style={{ position: 'absolute', width: '4px', height: '4px', borderRadius: '50%', background: p.id % 2 ? theme.particleColor : theme.particleAlt, left: `${p.left}%`, bottom: '-10px', opacity: 0.5, animation: `float ${p.duration}s infinite linear`, animationDelay: `${p.delay}s` }} />
+          <div 
+            key={p.id} 
+            style={{ 
+              position: 'absolute', 
+              width: '4px', 
+              height: '4px', 
+              borderRadius: '50%', 
+              background: p.id % 2 ? theme.particleColor : theme.particleAlt, 
+              left: `${p.left}%`, 
+              bottom: '-10px', 
+              opacity: 0.5, 
+              animation: `float ${p.duration}s infinite linear`, 
+              animationDelay: `${p.delay}s` 
+            }} 
+          />
         ))}
       </div>
       
+      {/* Theme Toggle Button */}
       <button
-        onClick={() => {
-          const newTheme = !isDark ? 'dark' : 'light';
-          setIsDark(!isDark);
-          trackThemeToggle(newTheme);
-        }}
+        onClick={handleThemeToggle}
         style={{
           position: 'fixed',
           top: '20px',
@@ -736,13 +1022,9 @@ export default function BusinessCard() {
         {isDark ? '☀️ Light' : '🌙 Dark'}
       </button>
       
+      {/* Download Contact Button */}
       <button
-        onClick={() => {
-          downloadVCard();
-          trackContactDownload();
-          setShowSaved(true);
-          setTimeout(() => setShowSaved(false), 2000);
-        }}
+        onClick={handleDownload}
         style={{
           position: 'fixed',
           bottom: '5vh',
@@ -769,15 +1051,49 @@ export default function BusinessCard() {
         {showSaved ? '✓ Downloaded!' : 'Add to Contacts'}
       </button>
       
+      {/* Header */}
       <div style={{ color: theme.textPrimary, textAlign: 'center', padding: '10px', zIndex: 10 }}>
-        <h3 style={{ fontSize: '14px', color: theme.accentPrimary, letterSpacing: '3px', marginBottom: '5px', textTransform: 'uppercase' }}>{C.UI_TITLE}</h3>
+        <h3 style={{ 
+          fontSize: '14px', 
+          color: theme.accentPrimary, 
+          letterSpacing: '3px', 
+          marginBottom: '5px', 
+          textTransform: 'uppercase' 
+        }}>
+          {C.UI_TITLE}
+        </h3>
         <p style={{ fontSize: '12px', color: theme.textHint }}>{C.UI_INSTRUCTIONS}</p>
       </div>
-      <div ref={containerRef} style={{ width: '100%', height: '75vh', cursor: 'grab', touchAction: 'none' }} />
-      <div style={{ position: 'fixed', bottom: '10px', color: theme.textHint, fontSize: '12px', animation: 'pulse 2s infinite' }}>{C.UI_HINT}</div>
+      
+      {/* Three.js Canvas Container */}
+      <div 
+        ref={containerRef} 
+        style={{ width: '100%', height: '75vh', cursor: 'grab', touchAction: 'none' }} 
+      />
+      
+      {/* Bottom Hint */}
+      <div style={{ 
+        position: 'fixed', 
+        bottom: '10px', 
+        color: theme.textHint, 
+        fontSize: '12px', 
+        animation: 'pulse 2s infinite' 
+      }}>
+        {C.UI_HINT}
+      </div>
+      
+      {/* CSS Animations */}
       <style>{`
-        @keyframes float { 0% { transform: translateY(0); opacity: 0; } 5% { opacity: 0.5; } 95% { opacity: 0.5; } 100% { transform: translateY(-110vh); opacity: 0; } }
-        @keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+        @keyframes float { 
+          0% { transform: translateY(0); opacity: 0; } 
+          5% { opacity: 0.5; } 
+          95% { opacity: 0.5; } 
+          100% { transform: translateY(-110vh); opacity: 0; } 
+        }
+        @keyframes pulse { 
+          0%, 100% { opacity: 0.5; } 
+          50% { opacity: 1; } 
+        }
       `}</style>
     </div>
   );

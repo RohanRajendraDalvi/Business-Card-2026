@@ -1,5 +1,11 @@
-export const darkTheme = {
-  name: 'dark',
+// ============================================================================
+// DARK THEME VARIANTS
+// Export the one you want to use as 'darkTheme'
+// ============================================================================
+
+// Default Cyber Dark - Cyan & Orange
+export const darkCyber = {
+  name: 'dark-cyber',
   
   // Background colors
   bgPrimary: '#0d1117',
@@ -58,15 +64,329 @@ export const darkTheme = {
   // Corner bracket colors
   cornerFront: '#00d4ff',
   cornerBack: '#ffb347',
-  
-  // Three.js material properties
-  cardMetalness: 0.3,
-  cardRoughness: 0.4,
-  sideMetalness: 0.8,
-  sideRoughness: 0.2,
-  ambientIntensity: 0.35,
-  point1Intensity: 1.5,
-  point2Intensity: 1.0,
 };
 
+// Neon Pink - Cyberpunk vibes
+export const darkNeon = {
+  name: 'dark-neon',
+  
+  bgPrimary: '#0f0a1a',
+  bgSecondary: '#1a1025',
+  bgTertiary: '#0f0a1a',
+  bgRadialCenter: '#1f1430',
+  bgRadialEdge: '#0a0510',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.9)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#ff00ff',
+  accentSecondary: '#00ffff',
+  accentTertiary: '#ff6b6b',
+  accentCyan: '#00ffff',
+  
+  cardSide: 0x1f1430,
+  edgeColor: 0xff00ff,
+  orbColor1: 0xff00ff,
+  orbColor2: 0x00ffff,
+  lightColor1: 0xff00ff,
+  lightColor2: 0x00ffff,
+  
+  langBg: 'rgba(0,255,255,0.15)',
+  langBorder: 'rgba(0,255,255,0.5)',
+  frameworkBg: 'rgba(255,0,255,0.12)',
+  frameworkBorder: 'rgba(255,0,255,0.4)',
+  aiBg: 'rgba(255,107,107,0.15)',
+  aiBorder: 'rgba(255,107,107,0.5)',
+  
+  gridColor: 'rgba(255,0,255,0.08)',
+  circuitColor: 'rgba(255,0,255,0.12)',
+  glassesColor: 'rgba(255,0,255,0.5)',
+  glassesFill: 'rgba(255,0,255,0.15)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#00ffff',
+  ctaText: '#0a0510',
+  
+  particleColor: '#ff00ff',
+  particleAlt: '#00ffff',
+  
+  cornerFront: '#ff00ff',
+  cornerBack: '#00ffff',
+};
+
+// Forest - Deep greens
+export const darkForest = {
+  name: 'dark-forest',
+  
+  bgPrimary: '#0a1510',
+  bgSecondary: '#0f1f18',
+  bgTertiary: '#0a1510',
+  bgRadialCenter: '#142820',
+  bgRadialEdge: '#050a08',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.9)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#4ade80',
+  accentSecondary: '#fbbf24',
+  accentTertiary: '#a78bfa',
+  accentCyan: '#34d399',
+  
+  cardSide: 0x142820,
+  edgeColor: 0x4ade80,
+  orbColor1: 0x4ade80,
+  orbColor2: 0xfbbf24,
+  lightColor1: 0x4ade80,
+  lightColor2: 0xfbbf24,
+  
+  langBg: 'rgba(251,191,36,0.15)',
+  langBorder: 'rgba(251,191,36,0.5)',
+  frameworkBg: 'rgba(74,222,128,0.12)',
+  frameworkBorder: 'rgba(74,222,128,0.4)',
+  aiBg: 'rgba(167,139,250,0.15)',
+  aiBorder: 'rgba(167,139,250,0.5)',
+  
+  gridColor: 'rgba(74,222,128,0.08)',
+  circuitColor: 'rgba(74,222,128,0.12)',
+  glassesColor: 'rgba(74,222,128,0.5)',
+  glassesFill: 'rgba(74,222,128,0.15)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#4ade80',
+  ctaText: '#050a08',
+  
+  particleColor: '#4ade80',
+  particleAlt: '#fbbf24',
+  
+  cornerFront: '#4ade80',
+  cornerBack: '#fbbf24',
+};
+
+// Ocean - Deep blues and teals
+export const darkOcean = {
+  name: 'dark-ocean',
+  
+  bgPrimary: '#0a1628',
+  bgSecondary: '#0f2137',
+  bgTertiary: '#0a1628',
+  bgRadialCenter: '#142d4a',
+  bgRadialEdge: '#050b14',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.9)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#38bdf8',
+  accentSecondary: '#2dd4bf',
+  accentTertiary: '#a78bfa',
+  accentCyan: '#22d3ee',
+  
+  cardSide: 0x142d4a,
+  edgeColor: 0x38bdf8,
+  orbColor1: 0x38bdf8,
+  orbColor2: 0x2dd4bf,
+  lightColor1: 0x38bdf8,
+  lightColor2: 0x2dd4bf,
+  
+  langBg: 'rgba(45,212,191,0.15)',
+  langBorder: 'rgba(45,212,191,0.5)',
+  frameworkBg: 'rgba(56,189,248,0.12)',
+  frameworkBorder: 'rgba(56,189,248,0.4)',
+  aiBg: 'rgba(167,139,250,0.15)',
+  aiBorder: 'rgba(167,139,250,0.5)',
+  
+  gridColor: 'rgba(56,189,248,0.08)',
+  circuitColor: 'rgba(56,189,248,0.12)',
+  glassesColor: 'rgba(56,189,248,0.5)',
+  glassesFill: 'rgba(56,189,248,0.15)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#2dd4bf',
+  ctaText: '#050b14',
+  
+  particleColor: '#38bdf8',
+  particleAlt: '#2dd4bf',
+  
+  cornerFront: '#38bdf8',
+  cornerBack: '#2dd4bf',
+};
+
+// Sunset - Warm oranges and reds
+export const darkSunset = {
+  name: 'dark-sunset',
+  
+  bgPrimary: '#1a0f0a',
+  bgSecondary: '#251510',
+  bgTertiary: '#1a0f0a',
+  bgRadialCenter: '#2d1810',
+  bgRadialEdge: '#0f0805',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.9)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#f97316',
+  accentSecondary: '#facc15',
+  accentTertiary: '#fb7185',
+  accentCyan: '#fb923c',
+  
+  cardSide: 0x2d1810,
+  edgeColor: 0xf97316,
+  orbColor1: 0xf97316,
+  orbColor2: 0xfacc15,
+  lightColor1: 0xf97316,
+  lightColor2: 0xfacc15,
+  
+  langBg: 'rgba(250,204,21,0.15)',
+  langBorder: 'rgba(250,204,21,0.5)',
+  frameworkBg: 'rgba(249,115,22,0.12)',
+  frameworkBorder: 'rgba(249,115,22,0.4)',
+  aiBg: 'rgba(251,113,133,0.15)',
+  aiBorder: 'rgba(251,113,133,0.5)',
+  
+  gridColor: 'rgba(249,115,22,0.08)',
+  circuitColor: 'rgba(249,115,22,0.12)',
+  glassesColor: 'rgba(249,115,22,0.5)',
+  glassesFill: 'rgba(249,115,22,0.15)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#facc15',
+  ctaText: '#0f0805',
+  
+  particleColor: '#f97316',
+  particleAlt: '#facc15',
+  
+  cornerFront: '#f97316',
+  cornerBack: '#facc15',
+};
+
+// Monochrome - Clean grays
+export const darkMono = {
+  name: 'dark-mono',
+  
+  bgPrimary: '#121212',
+  bgSecondary: '#1e1e1e',
+  bgTertiary: '#121212',
+  bgRadialCenter: '#252525',
+  bgRadialEdge: '#0a0a0a',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.85)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#e5e5e5',
+  accentSecondary: '#a3a3a3',
+  accentTertiary: '#737373',
+  accentCyan: '#d4d4d4',
+  
+  cardSide: 0x252525,
+  edgeColor: 0xe5e5e5,
+  orbColor1: 0xe5e5e5,
+  orbColor2: 0xa3a3a3,
+  lightColor1: 0xffffff,
+  lightColor2: 0xa3a3a3,
+  
+  langBg: 'rgba(163,163,163,0.15)',
+  langBorder: 'rgba(163,163,163,0.5)',
+  frameworkBg: 'rgba(229,229,229,0.12)',
+  frameworkBorder: 'rgba(229,229,229,0.4)',
+  aiBg: 'rgba(115,115,115,0.15)',
+  aiBorder: 'rgba(115,115,115,0.5)',
+  
+  gridColor: 'rgba(229,229,229,0.06)',
+  circuitColor: 'rgba(229,229,229,0.1)',
+  glassesColor: 'rgba(229,229,229,0.5)',
+  glassesFill: 'rgba(229,229,229,0.1)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#e5e5e5',
+  ctaText: '#0a0a0a',
+  
+  particleColor: '#e5e5e5',
+  particleAlt: '#a3a3a3',
+  
+  cornerFront: '#e5e5e5',
+  cornerBack: '#a3a3a3',
+};
+
+// Royal - Purple and gold
+export const darkRoyal = {
+  name: 'dark-royal',
+  
+  bgPrimary: '#110f1a',
+  bgSecondary: '#1a1625',
+  bgTertiary: '#110f1a',
+  bgRadialCenter: '#221d30',
+  bgRadialEdge: '#0a0810',
+  
+  textPrimary: '#ffffff',
+  textSecondary: 'rgba(255,255,255,0.95)',
+  textMuted: 'rgba(255,255,255,0.9)',
+  textHint: 'rgba(255,255,255,0.6)',
+  
+  accentPrimary: '#a855f7',
+  accentSecondary: '#fcd34d',
+  accentTertiary: '#f472b6',
+  accentCyan: '#c084fc',
+  
+  cardSide: 0x221d30,
+  edgeColor: 0xa855f7,
+  orbColor1: 0xa855f7,
+  orbColor2: 0xfcd34d,
+  lightColor1: 0xa855f7,
+  lightColor2: 0xfcd34d,
+  
+  langBg: 'rgba(252,211,77,0.15)',
+  langBorder: 'rgba(252,211,77,0.5)',
+  frameworkBg: 'rgba(168,85,247,0.12)',
+  frameworkBorder: 'rgba(168,85,247,0.4)',
+  aiBg: 'rgba(244,114,182,0.15)',
+  aiBorder: 'rgba(244,114,182,0.5)',
+  
+  gridColor: 'rgba(168,85,247,0.08)',
+  circuitColor: 'rgba(168,85,247,0.12)',
+  glassesColor: 'rgba(168,85,247,0.5)',
+  glassesFill: 'rgba(168,85,247,0.15)',
+  
+  qrBgColor: 'ffffff',
+  qrFgColor: '000000',
+  qrBg: '#ffffff',
+  
+  ctaBg: '#fcd34d',
+  ctaText: '#0a0810',
+  
+  particleColor: '#a855f7',
+  particleAlt: '#fcd34d',
+  
+  cornerFront: '#a855f7',
+  cornerBack: '#fcd34d',
+};
+
+// ============================================================================
+// EXPORT DEFAULT THEME
+// Change this to use a different variant
+// ============================================================================
+export const darkTheme = darkCyber;
 export default darkTheme;
